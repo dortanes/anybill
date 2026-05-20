@@ -13,7 +13,7 @@ import { Account } from "../../entities/Account";
 import { hashPassword, comparePassword } from "../../core/auth";
 import { BillingService } from "../../services/BillingService";
 import { ChangePasswordBody } from "../../models/AuthModels";
-import { UpdateCheckoutSettingsBody } from "../../models/SettingsModels";
+import { UpdateCheckoutSettingsBody, UpdateBillingSettingsBody } from "../../models/SettingsModels";
 
 @Controller("/settings")
 @UseBefore(AdminGuard)
@@ -36,6 +36,8 @@ export class SettingsController {
             email: account.email,
             checkoutConfig: account.checkoutConfig,
             successRedirectUrl: account.successRedirectUrl,
+            invoiceAutoExpire: account.invoiceAutoExpire,
+            invoiceExpireTtlMinutes: account.invoiceExpireTtlMinutes,
         };
     }
 
@@ -70,6 +72,21 @@ export class SettingsController {
         if (data.successRedirectUrl !== undefined) account.successRedirectUrl = data.successRedirectUrl;
         await AppDataSource.getRepository(Account).save(account);
         return { success: true };
+    }
+
+    @Put("/billing")
+    @Summary("Update billing settings")
+    @Description("Updates invoice auto-expiration settings.")
+    @Returns(200)
+    async updateBilling(@BodyParams() data: UpdateBillingSettingsBody) {
+        const account = await this.getAccount();
+        if (data.invoiceAutoExpire !== undefined) account.invoiceAutoExpire = data.invoiceAutoExpire;
+        if (data.invoiceExpireTtlMinutes !== undefined) account.invoiceExpireTtlMinutes = data.invoiceExpireTtlMinutes;
+        await AppDataSource.getRepository(Account).save(account);
+        return {
+            invoiceAutoExpire: account.invoiceAutoExpire,
+            invoiceExpireTtlMinutes: account.invoiceExpireTtlMinutes,
+        };
     }
 
     @Get("/providers")

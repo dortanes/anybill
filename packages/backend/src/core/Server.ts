@@ -63,6 +63,8 @@ import { SquadController } from "../controllers/sdk/SquadController";
 // ─── Health ─────────────────────────────────────────────────────────
 import { HealthController } from "../controllers/HealthController";
 
+// ─── Background Workers (side-effect imports for DI registration) ───
+import "../services/InvoiceExpirationWorker";
 
 
 

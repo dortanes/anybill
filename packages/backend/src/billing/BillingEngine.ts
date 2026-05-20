@@ -288,6 +288,32 @@ export class BillingEngine {
         return result;
     }
 
+    /**
+     * Cancel a pending payment via the named provider.
+     *
+     * @param providerName - The registered provider name.
+     * @param ctx          - Cancel context (invoiceId, amount, etc.).
+     * @returns The cancel result from the provider.
+     * @throws {BillingError} If the provider doesn't support cancellation.
+     */
+    async cancel(providerName: string, ctx: Record<string, any>): Promise<PaymentResult> {
+        const provider = this.resolveProvider(providerName);
+        const methodName = getMethodForRole(provider, "cancel");
+        if (!methodName) {
+            throw new BillingError(`Provider "${providerName}" does not support cancellation (@CancelPayment)`, "BAD_REQUEST");
+        }
+
+        if (this.debug) this.logger.debug(`→ ${providerName}.${methodName}()`);
+
+        const result: PaymentResult = await (provider as any)[methodName](ctx);
+
+        if (result.action === "cancelled") {
+            await this.emit("payment:cancelled", { provider: providerName, payment: result });
+        }
+
+        return result;
+    }
+
     // ─── Private Helpers ────────────────────────────────────────
 
     /**

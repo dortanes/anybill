@@ -68,6 +68,11 @@ export class BillingService implements OnInit {
         return this.engine.getProviders();
     }
 
+    /** Expose the engine instance for the invoice expiration worker. */
+    getEngine(): BillingEngine {
+        return this.engine;
+    }
+
     /**
      * Create a payment for a subscription plan.
      *
@@ -108,16 +113,40 @@ export class BillingService implements OnInit {
         }
 
         // Cancel stale pending invoices for this subscriber+subscription.
-        await invoiceRepo
-            .createQueryBuilder()
-            .update(Invoice)
-            .set({ status: "cancelled" })
-            .where("subscriberId = :sid AND subscriptionId = :subId AND status = :status", {
-                sid: subscriber.id,
-                subId: subscriptionId,
+        // First, attempt provider-side cancellation for invoices that have a provider reference.
+        const stalePending = await invoiceRepo.find({
+            where: {
+                subscriberId: subscriber.id,
+                subscriptionId,
                 status: "pending",
-            })
-            .execute();
+            },
+        });
+
+        for (const stale of stalePending) {
+            if (stale.providerInvoiceId && stale.provider && this.engine.can(stale.provider, "cancel")) {
+                this.engine.cancel(stale.provider, {
+                    invoiceId: stale.id,
+                    providerInvoiceId: stale.providerInvoiceId,
+                    amount: stale.amount,
+                    currency: stale.currency,
+                    providerData: stale.providerData,
+                }).catch((err) => this.logger.error(`Provider cancel failed for invoice ${stale.id}: ${err.message}`));
+            }
+        }
+
+        // Bulk-cancel in DB.
+        if (stalePending.length > 0) {
+            await invoiceRepo
+                .createQueryBuilder()
+                .update(Invoice)
+                .set({ status: "cancelled" })
+                .where("subscriberId = :sid AND subscriptionId = :subId AND status = :status", {
+                    sid: subscriber.id,
+                    subId: subscriptionId,
+                    status: "pending",
+                })
+                .execute();
+        }
 
         // Create pending invoice.
         const invoice = invoiceRepo.create({

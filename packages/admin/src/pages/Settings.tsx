@@ -1,4 +1,4 @@
-/** Settings page — checkout configuration and password management. */
+/** Settings page — checkout configuration, billing settings, and password management. */
 import { createSignal, onMount, Show } from "solid-js";
 import { api } from "../api/client";
 
@@ -14,11 +14,19 @@ export function Settings() {
     const [saveMsg, setSaveMsg] = createSignal("");
     const [saveSuccess, setSaveSuccess] = createSignal(false);
 
+    // Invoice auto-expiration
+    const [autoExpire, setAutoExpire] = createSignal(true);
+    const [expireTtl, setExpireTtl] = createSignal(1440);
+    const [billingMsg, setBillingMsg] = createSignal("");
+    const [billingSuccess, setBillingSuccess] = createSignal(false);
+
     onMount(async () => {
         const data = await api.get("/settings");
         setSettings(data);
         setRedirectUrl(data.successRedirectUrl || "");
         setHidePoweredBy(data.checkoutConfig?.hidePoweredBy ?? false);
+        setAutoExpire(data.invoiceAutoExpire ?? false);
+        setExpireTtl(data.invoiceExpireTtlMinutes ?? 1440);
     });
 
     const changePassword = async (e: Event) => {
@@ -56,6 +64,22 @@ export function Settings() {
         } catch (err: any) {
             setSaveMsg(err.message);
             setSaveSuccess(false);
+        }
+    };
+
+    const saveBilling = async () => {
+        setBillingMsg("");
+        setBillingSuccess(false);
+        try {
+            await api.put("/settings/billing", {
+                invoiceAutoExpire: autoExpire(),
+                invoiceExpireTtlMinutes: expireTtl(),
+            });
+            setBillingMsg("Saved!");
+            setBillingSuccess(true);
+        } catch (err: any) {
+            setBillingMsg(err.message);
+            setBillingSuccess(false);
         }
     };
 
@@ -99,6 +123,41 @@ export function Settings() {
                 </div>
 
                 <div class="card">
+                    <div class="card-title">Invoice Auto-Expiration</div>
+                    <div class="form-group">
+                        <label class="toggle-row">
+                            <input
+                                type="checkbox"
+                                checked={autoExpire()}
+                                onChange={(e) => setAutoExpire(e.target.checked)}
+                            />
+                            <span>Enable automatic expiration of pending invoices</span>
+                        </label>
+                        <div class="form-hint">
+                            When enabled, pending invoices older than the configured TTL will be automatically cancelled
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Expiration time (minutes)</label>
+                        <input
+                            type="number"
+                            min="1"
+                            value={expireTtl()}
+                            onInput={(e) => setExpireTtl(Number(e.target.value))}
+                            disabled={!autoExpire()}
+                            style={{ "max-width": "200px" }}
+                        />
+                        <div class="form-hint">Default: 1440 minutes (24 hours)</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button class="btn btn-primary" onClick={saveBilling}>Save changes</button>
+                        <Show when={billingMsg()}>
+                            <span class={`text-sm ${billingSuccess() ? "text-success" : "text-danger"}`}>{billingMsg()}</span>
+                        </Show>
+                    </div>
+                </div>
+
+                <div class="card">
                     <div class="card-title">Change Password</div>
                     <form onSubmit={changePassword}>
                         <div class="form-group">
@@ -127,3 +186,4 @@ export function Settings() {
         </div>
     );
 }
+

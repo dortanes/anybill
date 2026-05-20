@@ -32,6 +32,14 @@ export class Account {
     @Column({ type: "text", nullable: true })
     successRedirectUrl!: string | null;
 
+    /** Whether auto-expiration of stale pending invoices is enabled. */
+    @Column({ default: true })
+    invoiceAutoExpire!: boolean;
+
+    /** TTL for pending invoices in minutes before auto-cancellation. Default: 1440 (24h). */
+    @Column({ default: 1440 })
+    invoiceExpireTtlMinutes!: number;
+
     @CreateDateColumn()
     createdAt!: Date;
 
