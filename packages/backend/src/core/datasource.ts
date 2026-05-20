@@ -23,12 +23,13 @@ import { WebhookDelivery } from "../entities/WebhookDelivery";
 import { Squad } from "../entities/Squad";
 import { SquadMember } from "../entities/SquadMember";
 import { Coupon } from "../entities/Coupon";
+import { SquadInvite } from "../entities/SquadInvite";
 
 /** Shared TypeORM DataSource instance. */
 export const AppDataSource = new DataSource({
     type: "better-sqlite3",
     database: process.env.DB_PATH || "./data/anybill.db",
-    entities: [Account, Subscription, Subscriber, Invoice, ApiKey, WebhookEndpoint, WebhookDelivery, Squad, SquadMember, Coupon],
+    entities: [Account, Subscription, Subscriber, Invoice, ApiKey, WebhookEndpoint, WebhookDelivery, Squad, SquadMember, Coupon, SquadInvite],
     synchronize: true,
     logging: process.env.VERBOSE_LOGS === "true",
 });

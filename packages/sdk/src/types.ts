@@ -111,6 +111,23 @@ export interface SquadMember {
     removedAt: string | null;
 }
 
+/** Status of a squad invite. */
+export type InviteStatus = "pending" | "accepted" | "declined" | "cancelled" | "expired";
+
+/** A squad invite — sent from the owner to a potential member. */
+export interface SquadInvite {
+    id: string;
+    /** Squad UUID the invite belongs to. */
+    squadId: string;
+    /** External user ID of the invited user. */
+    uid: string;
+    status: InviteStatus;
+    /** ISO 8601 expiration timestamp. Null = no expiration. */
+    expiresAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
 /** Result of an access check. */
 export interface AccessCheck {
     /** Whether the user has access. */

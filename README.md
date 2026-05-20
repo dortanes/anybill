@@ -34,6 +34,7 @@ Payment providers are connected through the `@anybill/sdk` — you extend a base
 - **Provider-agnostic** — connect any payment gateway through the SDK's decorator-based provider system.
 - **Self-contained** — ships as a single Docker container with SQLite. No Redis, no Postgres, no external services.
 - **Group subscriptions** — built-in Squads: an owner pays, members get access. Auto-created on purchase of squad-enabled plans.
+- **Squad invite flow** — owners invite users by UID; invitees accept or decline via SDK. Configurable TTL, auto-expiry, full webhook coverage.
 - **Outgoing webhooks** — HMAC-SHA256 signed events dispatched to your endpoints with exponential backoff retries.
 - **Client portal** — encrypted-token-based subscriber self-service: cancel, renew, change plan.
 - **Coupons & promo codes** — percentage or fixed-amount discounts with per-user limits, plan restrictions, and expiration.
@@ -163,6 +164,11 @@ const portal = await client.createPortalLink("user_123");
 // Manage squad members
 await client.squads.addMember("squad_id", "friend_uid");
 const members = await client.squads.getMembers("squad_id");
+
+// Squad invite flow
+await client.squads.invites.create("squad_id", "friend_uid");      // owner invites
+const inbox = await client.squads.invites.incoming("friend_uid", "pending"); // friend's inbox
+await client.squads.invites.accept("squad_id", inbox[0].id, "friend_uid");   // friend accepts
 ```
 
 Full SDK reference: [`packages/sdk/README.md`](packages/sdk/README.md)
@@ -186,7 +192,13 @@ Failed deliveries are retried with exponential backoff (10s → 1m → 5m → 30
 | `squad.dissolved` | Squad dissolved |
 | `squad.member_added` | Member added to squad |
 | `squad.member_removed` | Member removed from squad |
+| `squad.invite_created` | Owner sent an invite |
+| `squad.invite_accepted` | Invitee accepted an invite |
+| `squad.invite_declined` | Invitee declined an invite |
+| `squad.invite_cancelled` | Owner cancelled an invite |
 | `coupon.redeemed` | Coupon applied to a paid invoice |
+| `trial.started` | Free trial activated |
+| `trial.expired` | Free trial period ended |
 
 ## Configuration
 
@@ -276,6 +288,12 @@ API key-protected. Used by client applications via the TypeScript SDK.
 | `POST` | `/squads/:id/members` | Add member |
 | `DELETE` | `/squads/:id/members/:uid` | Remove member |
 | `GET` | `/squads/:id/members` | List members |
+| `POST` | `/squads/:id/invites` | Create invite |
+| `GET` | `/squads/:id/invites` | List squad invites |
+| `POST` | `/squads/:id/invites/:id/accept` | Accept invite |
+| `POST` | `/squads/:id/invites/:id/decline` | Decline invite |
+| `DELETE` | `/squads/:id/invites/:id` | Cancel invite |
+| `GET` | `/invites` | List incoming invites by UID |
 
 </details>
 

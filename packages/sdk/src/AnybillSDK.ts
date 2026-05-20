@@ -17,7 +17,7 @@
  * ```
  */
 
-import type { AnybillSDKConfig, Subscription, Subscriber, Invoice, CheckoutLink, PortalLink, Squad, SquadMember, AccessCheck } from "./types";
+import type { AnybillSDKConfig, Subscription, Subscriber, Invoice, CheckoutLink, PortalLink, Squad, SquadMember, SquadInvite, InviteStatus, AccessCheck } from "./types";
 
 /**
  * AnyBill SDK client.
@@ -267,6 +267,85 @@ export class AnybillSDK {
          */
         getMembers: (squadId: string): Promise<SquadMember[]> =>
             this.request(`/squads/${squadId}/members`),
+
+        /**
+         * Squad invite management.
+         *
+         * Invites allow an owner to request a user join their squad.
+         * The user (invitee) can accept or decline via their own SDK call.
+         */
+        invites: {
+            /**
+             * Create an invite for a user to join a squad.
+             *
+             * TTL defaults to the global setting (Settings → Billing → inviteTtlDays).
+             * Pass `ttlDays` to override per-invite; `0` = no expiration.
+             *
+             * @param squadId - Squad UUID.
+             * @param uid     - External user ID of the invitee.
+             * @param options - Optional `ttlDays` override.
+             */
+            create: (squadId: string, uid: string, options?: { ttlDays?: number }): Promise<SquadInvite> =>
+                this.post(`/squads/${squadId}/invites`, { uid, ttlDays: options?.ttlDays }),
+
+            /**
+             * List invites for a squad.
+             *
+             * @param squadId - Squad UUID.
+             * @param status  - Optional status filter.
+             */
+            list: (squadId: string, status?: InviteStatus): Promise<SquadInvite[]> => {
+                const url = status
+                    ? `/squads/${squadId}/invites?status=${encodeURIComponent(status)}`
+                    : `/squads/${squadId}/invites`;
+                return this.request(url);
+            },
+
+            /**
+             * Accept a squad invite.
+             *
+             * The uid must match the invite's target uid.
+             *
+             * @param squadId  - Squad UUID.
+             * @param inviteId - Invite UUID.
+             * @param uid      - External user ID of the invitee.
+             */
+            accept: (squadId: string, inviteId: string, uid: string): Promise<SquadInvite> =>
+                this.post(`/squads/${squadId}/invites/${inviteId}/accept`, { uid }),
+
+            /**
+             * Decline a squad invite.
+             *
+             * The uid must match the invite's target uid.
+             *
+             * @param squadId  - Squad UUID.
+             * @param inviteId - Invite UUID.
+             * @param uid      - External user ID of the invitee.
+             */
+            decline: (squadId: string, inviteId: string, uid: string): Promise<SquadInvite> =>
+                this.post(`/squads/${squadId}/invites/${inviteId}/decline`, { uid }),
+
+            /**
+             * Cancel a pending invite (owner action).
+             *
+             * @param squadId  - Squad UUID.
+             * @param inviteId - Invite UUID.
+             */
+            cancel: (squadId: string, inviteId: string): Promise<{ cancelled: boolean }> =>
+                this.del(`/squads/${squadId}/invites/${inviteId}`),
+
+            /**
+             * Get incoming invites for a user (invitee's inbox).
+             *
+             * @param uid    - External user ID.
+             * @param status - Optional status filter (e.g. "pending").
+             */
+            incoming: (uid: string, status?: InviteStatus): Promise<SquadInvite[]> => {
+                let url = `/invites?uid=${encodeURIComponent(uid)}`;
+                if (status) url += `&status=${encodeURIComponent(status)}`;
+                return this.request(url);
+            },
+        },
     };
 
 }

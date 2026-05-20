@@ -6,9 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-05-21
+
 ### Added
 
-- **Plan metadata editor** — Key-value editor in the admin plan form for attaching arbitrary custom properties to subscription plans (e.g. `max_proxies`, `features`). Values are stored as JSON in `Subscription.metadata` and returned via all relevant API endpoints. Numeric strings are automatically cast to numbers.
+- **Squad Invite Flow** — owners can invite users to their squad by external UID; invitees accept or decline via the SDK. Invite state machine: `pending` → `accepted` | `declined` | `cancelled` | `expired`
+- **`SquadInvite` entity** — new database entity with composite index on `(squadId, uid, status)`; cascades on squad deletion
+- **`GET /api/sdk/invites`** — invitee inbox: list all incoming invites by uid with optional status filter
+- **Invite endpoints** — `POST/GET/DELETE /api/sdk/squads/:id/invites[/:inviteId[/accept|decline]]` — full invite CRUD plus accept/decline actions
+- **Invite TTL** — configurable default TTL via Settings → Billing (`inviteTtlDays`, default 7 days, 0 = no expiration); overridable per-invite via `ttlDays` parameter
+- **Auto-expiry** — background worker now bulk-expires stale pending invites on each poll cycle
+- **4 new webhook events** — `squad.invite_created`, `squad.invite_accepted`, `squad.invite_declined`, `squad.invite_cancelled`
+- **SDK methods** — `client.squads.invites.{create, list, accept, decline, cancel, incoming}`
+- **SDK types** — `SquadInvite`, `InviteStatus`
+- **Plan metadata editor** — key-value editor in the admin plan form for attaching arbitrary custom properties (e.g. `max_proxies`, `features`). Values stored as JSON in `Subscription.metadata`; numeric strings auto-cast
+
+### Changed
+
+- Settings `GET /api/admin/settings` and `PUT /api/admin/settings/billing` now include `inviteTtlDays`
+- `InvoiceExpirationWorker` log message updated to reflect invite expiry participation
 
 ## [0.2.1] — 2025-05-20
 

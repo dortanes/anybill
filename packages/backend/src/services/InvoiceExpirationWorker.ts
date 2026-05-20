@@ -22,6 +22,7 @@ import { Invoice } from "../entities/Invoice";
 import { Subscriber } from "../entities/Subscriber";
 import { BillingService } from "./BillingService";
 import { OutgoingWebhookService } from "./OutgoingWebhookService";
+import { SquadService } from "./SquadService";
 
 const POLL_MS = Number(process.env.INVOICE_EXPIRE_POLL_MS) || 60_000;
 
@@ -35,14 +36,16 @@ export class InvoiceExpirationWorker implements OnInit, OnDestroy {
     constructor(
         private readonly billing: BillingService,
         private readonly outgoingWebhooks: OutgoingWebhookService,
+        private readonly squads: SquadService,
     ) {}
 
     async $onInit(): Promise<void> {
         this.timer = setInterval(async () => {
             await this.processExpiredInvoices();
             await this.processExpiredTrials();
+            await this.squads.expireStaleInvites();
         }, POLL_MS);
-        this.logger.info(`Invoice and trial expiration worker started (poll every ${POLL_MS}ms)`);
+        this.logger.info(`Invoice, trial, and invite expiration worker started (poll every ${POLL_MS}ms)`);
     }
 
     $onDestroy(): void {

@@ -15,8 +15,10 @@ import { In } from "typeorm";
 import { AppDataSource } from "../core/datasource";
 import { Squad } from "../entities/Squad";
 import { SquadMember } from "../entities/SquadMember";
+import { SquadInvite } from "../entities/SquadInvite";
 import { Subscriber } from "../entities/Subscriber";
 import { Subscription } from "../entities/Subscription";
+import { Account } from "../entities/Account";
 import { OutgoingWebhookService } from "./OutgoingWebhookService";
 
 @Injectable()
@@ -350,5 +352,248 @@ export class SquadService {
         }
 
         return { hasAccess: false };
+    }
+
+    // ─── Invite Management ──────────────────────────────────────
+
+    /**
+     * Create an invite for a user to join a squad.
+     *
+     * @param squadId  - Squad UUID.
+     * @param uid      - External user ID of the invitee.
+     * @param ttlDays  - Optional TTL override in days. Reads from account settings if omitted. 0 = no expiry.
+     * @returns The newly created invite.
+     */
+    async createInvite(squadId: string, uid: string, ttlDays?: number): Promise<SquadInvite> {
+        const squadRepo = AppDataSource.getRepository(Squad);
+        const inviteRepo = AppDataSource.getRepository(SquadInvite);
+
+        const squad = await squadRepo.findOne({
+            where: { id: squadId },
+            relations: ["owner", "members"],
+        });
+        if (!squad) throw new NotFound("Squad not found");
+
+        // Owner cannot be invited
+        if (squad.owner.uid === uid) {
+            throw new BadRequest("Cannot invite the squad owner");
+        }
+
+        // Already an active member?
+        const isActiveMember = squad.members.some((m) => m.uid === uid && m.status === "active");
+        if (isActiveMember) {
+            throw new Conflict("User is already an active member of this squad");
+        }
+
+        // Already has a pending invite?
+        const existingInvite = await inviteRepo.findOneBy({ squadId, uid, status: "pending" });
+        if (existingInvite) {
+            throw new Conflict("A pending invite already exists for this user");
+        }
+
+        // Check member limit before creating the invite (0 = unlimited)
+        const activeCount = squad.members.filter((m) => m.status === "active").length;
+        if (squad.maxMembers > 0 && activeCount >= squad.maxMembers) {
+            throw new BadRequest(`Squad member limit reached (max: ${squad.maxMembers})`);
+        }
+
+        // Resolve TTL: explicit param > account setting > no expiry
+        let expiresAt: Date | null = null;
+        const effectiveTtlDays = ttlDays ?? (await this.getAccountInviteTtlDays());
+        if (effectiveTtlDays > 0) {
+            expiresAt = new Date(Date.now() + effectiveTtlDays * 86_400_000);
+        }
+
+        const invite = inviteRepo.create({ squadId, uid, expiresAt });
+        await inviteRepo.save(invite);
+
+        this.logger.info(`Squad invite created: ${invite.id} → uid ${uid} for squad ${squadId}`);
+
+        await this.outgoingWebhooks.dispatch("squad.invite_created", {
+            squadId,
+            inviteId: invite.id,
+            ownerUid: squad.owner.uid,
+            inviteeUid: uid,
+            expiresAt: expiresAt?.toISOString() ?? null,
+        });
+
+        return invite;
+    }
+
+    /**
+     * Accept a squad invite.
+     *
+     * The `uid` must match the invite's target uid (prevents others from accepting).
+     * Atomically updates invite status and adds the user as a squad member.
+     *
+     * @param inviteId - Invite UUID.
+     * @param uid      - External user ID of the invitee.
+     * @returns The updated invite.
+     */
+    async acceptInvite(inviteId: string, uid: string): Promise<SquadInvite> {
+        const inviteRepo = AppDataSource.getRepository(SquadInvite);
+        const invite = await inviteRepo.findOne({
+            where: { id: inviteId },
+            relations: ["squad", "squad.owner"],
+        });
+        if (!invite) throw new NotFound("Invite not found");
+        if (invite.uid !== uid) throw new BadRequest("This invite is not addressed to you");
+        if (invite.status !== "pending") throw new BadRequest(`Invite is already ${invite.status}`);
+        if (invite.expiresAt && invite.expiresAt < new Date()) {
+            invite.status = "expired";
+            await inviteRepo.save(invite);
+            throw new BadRequest("Invite has expired");
+        }
+
+        // Atomically: mark invite accepted + add member.
+        // If addMember fails (e.g. race condition on member limit), revert invite status.
+        invite.status = "accepted";
+        await inviteRepo.save(invite);
+        try {
+            await this.addMember(invite.squadId, uid);
+        } catch (err) {
+            invite.status = "pending";
+            await inviteRepo.save(invite);
+            throw err;
+        }
+
+        this.logger.info(`Squad invite accepted: ${inviteId} by uid ${uid}`);
+
+        await this.outgoingWebhooks.dispatch("squad.invite_accepted", {
+            squadId: invite.squadId,
+            inviteId,
+            ownerUid: invite.squad?.owner?.uid,
+            inviteeUid: uid,
+        });
+
+        return invite;
+    }
+
+    /**
+     * Decline a squad invite.
+     *
+     * The `uid` must match the invite's target uid.
+     *
+     * @param inviteId - Invite UUID.
+     * @param uid      - External user ID of the invitee.
+     * @returns The updated invite.
+     */
+    async declineInvite(inviteId: string, uid: string): Promise<SquadInvite> {
+        const inviteRepo = AppDataSource.getRepository(SquadInvite);
+        const invite = await inviteRepo.findOne({
+            where: { id: inviteId },
+            relations: ["squad", "squad.owner"],
+        });
+        if (!invite) throw new NotFound("Invite not found");
+        if (invite.uid !== uid) throw new BadRequest("This invite is not addressed to you");
+        if (invite.status !== "pending") throw new BadRequest(`Invite is already ${invite.status}`);
+
+        invite.status = "declined";
+        await inviteRepo.save(invite);
+
+        this.logger.info(`Squad invite declined: ${inviteId} by uid ${uid}`);
+
+        await this.outgoingWebhooks.dispatch("squad.invite_declined", {
+            squadId: invite.squadId,
+            inviteId,
+            ownerUid: invite.squad?.owner?.uid,
+            inviteeUid: uid,
+        });
+
+        return invite;
+    }
+
+    /**
+     * Cancel a pending invite (owner action).
+     *
+     * @param inviteId - Invite UUID.
+     * @param squadId  - Squad UUID (used to verify ownership).
+     */
+    async cancelInvite(inviteId: string, squadId: string): Promise<void> {
+        const inviteRepo = AppDataSource.getRepository(SquadInvite);
+        const invite = await inviteRepo.findOne({
+            where: { id: inviteId },
+            relations: ["squad", "squad.owner"],
+        });
+        if (!invite) throw new NotFound("Invite not found");
+        if (invite.squadId !== squadId) throw new NotFound("Invite not found in this squad");
+        if (invite.status !== "pending") throw new BadRequest(`Invite is already ${invite.status}`);
+
+        invite.status = "cancelled";
+        await inviteRepo.save(invite);
+
+        this.logger.info(`Squad invite cancelled: ${inviteId} (squad: ${squadId})`);
+
+        await this.outgoingWebhooks.dispatch("squad.invite_cancelled", {
+            squadId,
+            inviteId,
+            ownerUid: invite.squad?.owner?.uid,
+            inviteeUid: invite.uid,
+        });
+    }
+
+    /**
+     * List invites for a squad.
+     *
+     * @param squadId - Squad UUID.
+     * @param status  - Optional filter by status.
+     * @returns List of invites ordered by creation date desc.
+     */
+    async getInvites(squadId: string, status?: string): Promise<SquadInvite[]> {
+        const squad = await AppDataSource.getRepository(Squad).findOneBy({ id: squadId });
+        if (!squad) throw new NotFound("Squad not found");
+
+        const where: any = { squadId };
+        if (status) where.status = status;
+
+        return AppDataSource.getRepository(SquadInvite).find({
+            where,
+            order: { createdAt: "DESC" },
+        });
+    }
+
+    /**
+     * Get all invites for a given uid (invitee's inbox).
+     *
+     * @param uid    - External user ID.
+     * @param status - Optional filter by status.
+     * @returns List of invites ordered by creation date desc.
+     */
+    async getInvitesByUid(uid: string, status?: string): Promise<SquadInvite[]> {
+        const where: any = { uid };
+        if (status) where.status = status;
+
+        return AppDataSource.getRepository(SquadInvite).find({
+            where,
+            order: { createdAt: "DESC" },
+        });
+    }
+
+    /**
+     * Expire all pending invites whose TTL has elapsed.
+     * Called by the background expiration worker.
+     */
+    async expireStaleInvites(): Promise<void> {
+        const inviteRepo = AppDataSource.getRepository(SquadInvite);
+        const result = await inviteRepo
+            .createQueryBuilder()
+            .update(SquadInvite)
+            .set({ status: "expired" })
+            .where("status = :status", { status: "pending" })
+            .andWhere("expiresAt IS NOT NULL")
+            .andWhere("expiresAt <= :now", { now: new Date() })
+            .execute();
+
+        if (result.affected && result.affected > 0) {
+            this.logger.info(`Expired ${result.affected} stale squad invite(s)`);
+        }
+    }
+
+    // ─── Private Helpers ────────────────────────────────────────
+
+    /** Read the global invite TTL from account settings. */
+    private async getAccountInviteTtlDays(): Promise<number> {
+        const account = await AppDataSource.getRepository(Account).findOne({ where: {} });
+        return account?.inviteTtlDays ?? 7;
     }
 }

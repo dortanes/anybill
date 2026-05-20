@@ -3,7 +3,7 @@
  *
  * Squad management endpoints for the SDK API.
  *
- * Provides squad CRUD, member management, and access checking.
+ * Provides squad CRUD, member management, invite flow, and access checking.
  * Protected by API key authentication via the {@link SdkGuard}.
  */
 
@@ -12,6 +12,7 @@ import { Tags, Summary, Description, Returns } from "@tsed/schema";
 import { SdkGuard } from "../../core/SdkGuard";
 import { SquadService } from "../../services/SquadService";
 import { CreateSquadBody, AddSquadMemberBody } from "../../models/SquadModels";
+import { CreateInviteBody, InviteActionBody } from "../../models/InviteModels";
 
 @Controller("/")
 @UseBefore(SdkGuard)
@@ -106,6 +107,102 @@ export class SquadController {
     @Returns(404)
     async getMembers(@PathParams("id") id: string) {
         return this.squadService.getMembers(id);
+    }
+
+    // ─── Invite Endpoints ────────────────────────────────────────
+
+    /**
+     * Create a squad invite (owner action).
+     *
+     * The owner creates an invite for a specific user uid. The invitee's
+     * client application is responsible for surfacing the invite to the user.
+     * TTL defaults to the global setting (Settings → Billing → inviteTtlDays);
+     * pass `ttlDays` to override per-invite.
+     */
+    @Post("/squads/:id/invites")
+    @Summary("Create squad invite")
+    @Description("Creates an invite for a user to join a squad. TTL is taken from global settings unless overridden.")
+    @Returns(201)
+    @Returns(400)
+    @Returns(404)
+    @Returns(409)
+    async createInvite(
+        @PathParams("id") id: string,
+        @BodyParams() body: CreateInviteBody,
+    ) {
+        return this.squadService.createInvite(id, body.uid, body.ttlDays);
+    }
+
+    /** List invites for a squad (optionally filter by status). */
+    @Get("/squads/:id/invites")
+    @Summary("List squad invites")
+    @Description("Returns invites for a squad. Filter by status with ?status=pending|accepted|declined|cancelled|expired.")
+    @Returns(200)
+    @Returns(404)
+    async listInvites(
+        @PathParams("id") id: string,
+        @QueryParams("status") status?: string,
+    ) {
+        return this.squadService.getInvites(id, status);
+    }
+
+    /** Accept a squad invite (invitee action). */
+    @Post("/squads/:id/invites/:inviteId/accept")
+    @Summary("Accept squad invite")
+    @Description("Accepts a pending squad invite. The uid in the body must match the invite target.")
+    @Returns(200)
+    @Returns(400)
+    @Returns(404)
+    @Returns(409)
+    async acceptInvite(
+        @PathParams("id") id: string,
+        @PathParams("inviteId") inviteId: string,
+        @BodyParams() body: InviteActionBody,
+    ) {
+        return this.squadService.acceptInvite(inviteId, body.uid);
+    }
+
+    /** Decline a squad invite (invitee action). */
+    @Post("/squads/:id/invites/:inviteId/decline")
+    @Summary("Decline squad invite")
+    @Description("Declines a pending squad invite. The uid in the body must match the invite target.")
+    @Returns(200)
+    @Returns(400)
+    @Returns(404)
+    async declineInvite(
+        @PathParams("id") id: string,
+        @PathParams("inviteId") inviteId: string,
+        @BodyParams() body: InviteActionBody,
+    ) {
+        return this.squadService.declineInvite(inviteId, body.uid);
+    }
+
+    /** Cancel a pending invite (owner action). */
+    @Delete("/squads/:id/invites/:inviteId")
+    @Summary("Cancel squad invite")
+    @Description("Cancels a pending squad invite. Only the squad owner should call this.")
+    @Returns(200)
+    @Returns(400)
+    @Returns(404)
+    async cancelInvite(
+        @PathParams("id") id: string,
+        @PathParams("inviteId") inviteId: string,
+    ) {
+        await this.squadService.cancelInvite(inviteId, id);
+        return { cancelled: true };
+    }
+
+    /** Get incoming invites for a user uid. */
+    @Get("/invites")
+    @Summary("List incoming invites")
+    @Description("Returns all invites addressed to a specific uid. Filter by status with ?status=pending.")
+    @Returns(200)
+    async listIncomingInvites(
+        @QueryParams("uid") uid: string,
+        @QueryParams("status") status?: string,
+    ) {
+        if (!uid) return [];
+        return this.squadService.getInvitesByUid(uid, status);
     }
 
     /**

@@ -30,4 +30,10 @@ export class UpdateBillingSettingsBody {
     @Property(Number)
     @Description("Time-to-live for pending invoices in minutes before auto-cancellation.")
     invoiceExpireTtlMinutes?: number;
+
+    @Optional()
+    @Min(0)
+    @Property(Number)
+    @Description("Default TTL for squad invites in days. 0 = no expiration.")
+    inviteTtlDays?: number;
 }

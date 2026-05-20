@@ -38,6 +38,7 @@ export class SettingsController {
             successRedirectUrl: account.successRedirectUrl,
             invoiceAutoExpire: account.invoiceAutoExpire,
             invoiceExpireTtlMinutes: account.invoiceExpireTtlMinutes,
+            inviteTtlDays: account.inviteTtlDays,
         };
     }
 
@@ -82,10 +83,12 @@ export class SettingsController {
         const account = await this.getAccount();
         if (data.invoiceAutoExpire !== undefined) account.invoiceAutoExpire = data.invoiceAutoExpire;
         if (data.invoiceExpireTtlMinutes !== undefined) account.invoiceExpireTtlMinutes = data.invoiceExpireTtlMinutes;
+        if (data.inviteTtlDays !== undefined) account.inviteTtlDays = data.inviteTtlDays;
         await AppDataSource.getRepository(Account).save(account);
         return {
             invoiceAutoExpire: account.invoiceAutoExpire,
             invoiceExpireTtlMinutes: account.invoiceExpireTtlMinutes,
+            inviteTtlDays: account.inviteTtlDays,
         };
     }
 

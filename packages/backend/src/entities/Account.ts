@@ -40,6 +40,10 @@ export class Account {
     @Column({ default: 1440 })
     invoiceExpireTtlMinutes!: number;
 
+    /** Default TTL for squad invites in days. 0 = no expiration. Default: 7. */
+    @Column({ default: 7 })
+    inviteTtlDays!: number;
+
     @CreateDateColumn()
     createdAt!: Date;
 
