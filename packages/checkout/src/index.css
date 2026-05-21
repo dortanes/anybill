@@ -853,6 +853,8 @@ body {
     padding: 32px;
     width: 100%;
     max-width: 420px;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
     position: relative;
     animation: confirmIn 0.3s var(--ease);
 }
@@ -1163,6 +1165,91 @@ body {
 .portal-modal-lg .portal-modal-title,
 .portal-modal-lg .portal-modal-desc {
     text-align: left;
+}
+
+/* ─── Interval + Currency pill layout (Step 2) ─────── */
+
+.portal-interval-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 20px;
+}
+
+.portal-interval-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s var(--ease);
+}
+
+.portal-interval-row:has(.portal-currency-pill.selected) {
+    border-color: var(--accent);
+    background: rgba(99, 179, 237, 0.04);
+}
+
+.portal-interval-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    min-width: 90px;
+}
+
+.portal-currency-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.portal-currency-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 100px;
+    background: transparent;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    white-space: nowrap;
+}
+
+.portal-currency-pill:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    color: var(--text);
+    background: var(--bg-elevated);
+}
+
+.portal-currency-pill.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(99, 179, 237, 0.08);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.portal-currency-pill.current {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.portal-pill-current-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
 }
 
 

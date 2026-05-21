@@ -264,13 +264,22 @@ export function PortalPage() {
 
     const currentPlanName = () => data()?.subscriber?.subscription.name ?? "";
 
-    // Variants of the selected group (step 2), excluding the exact current plan id
-    const selectedGroupVariants = () => {
+    // Variants grouped by interval for step 2: [{intervalKey, label, variants[]}]
+    const selectedGroupIntervalRows = () => {
         const d = data();
         if (!d) return [];
         const g = planGroups().find(g => g.name === selectedGroupName());
         if (!g) return [];
-        return g.variants;
+        const map = new Map<string, PlanInfo[]>();
+        for (const v of g.variants) {
+            const key = `${v.interval}::${v.intervalCount}`;
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(v);
+        }
+        return [...map.entries()].map(([, variants]) => ({
+            intervalLabel: intervalLabel(variants[0].interval, variants[0].intervalCount),
+            variants,
+        }));
     };
 
     const openChangeModal = () => {
@@ -595,7 +604,7 @@ export function PortalPage() {
                             </div>
                         </Show>
 
-                        {/* Step 2 — pick a variant */}
+                        {/* Step 2 — pick a variant: grouped by interval, currencies inline */}
                         <Show when={changePlanStep() === 2}>
                             <button class="portal-back-btn" onClick={() => { setChangePlanStep(1); setSelectedPlan(""); }}>
                                 ← {t("common.back")}
@@ -603,40 +612,34 @@ export function PortalPage() {
                             <div class="portal-modal-title">{selectedGroupName()}</div>
                             <div class="portal-modal-desc">{t("portal.pickVariantDesc")}</div>
 
-                            <div class="portal-plan-list">
-                                <For each={selectedGroupVariants()}>
-                                    {(variant) => {
-                                        const isCurrent = variant.id === data()?.subscriber?.subscription.id;
-                                        return (
-                                            <label
-                                                class={`portal-plan-option ${
-                                                    selectedPlan() === variant.id ? "selected" : ""
-                                                } ${isCurrent ? "portal-plan-option-current" : ""}`}
-                                                onClick={() => !isCurrent && setSelectedPlan(variant.id)}
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="variant"
-                                                    checked={selectedPlan() === variant.id}
-                                                    disabled={isCurrent}
-                                                />
-                                                <div class="provider-radio" />
-                                                <div class="portal-plan-details">
-                                                    <div class="portal-plan-name">
-                                                        {formatPrice(variant.amount, variant.currency)}
-                                                        <Show when={isCurrent}>
-                                                            <span class="portal-plan-current-badge">{t("portal.currentPlan")}</span>
-                                                        </Show>
-                                                    </div>
-                                                    <div class="portal-plan-price">
-                                                        <span class="portal-plan-interval">
-                                                            {intervalLabel(variant.interval, variant.intervalCount)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        );
-                                    }}
+                            <div class="portal-interval-list">
+                                <For each={selectedGroupIntervalRows()}>
+                                    {(row) => (
+                                        <div class="portal-interval-row">
+                                            <div class="portal-interval-label">{row.intervalLabel}</div>
+                                            <div class="portal-currency-pills">
+                                                <For each={row.variants}>
+                                                    {(variant) => {
+                                                        const isCurrent = variant.id === data()?.subscriber?.subscription.id;
+                                                        const isSelected = selectedPlan() === variant.id;
+                                                        return (
+                                                            <button
+                                                                class={`portal-currency-pill${isSelected ? " selected" : ""}${isCurrent ? " current" : ""}`}
+                                                                onClick={() => !isCurrent && setSelectedPlan(variant.id)}
+                                                                disabled={isCurrent}
+                                                                title={isCurrent ? t("portal.currentPlan") : ""}
+                                                            >
+                                                                {formatPrice(variant.amount, variant.currency)}
+                                                                <Show when={isCurrent}>
+                                                                    <span class="portal-pill-current-dot" />
+                                                                </Show>
+                                                            </button>
+                                                        );
+                                                    }}
+                                                </For>
+                                            </div>
+                                        </div>
+                                    )}
                                 </For>
                             </div>
 
