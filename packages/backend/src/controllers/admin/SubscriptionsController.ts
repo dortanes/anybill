@@ -18,7 +18,7 @@ import { AppError } from "../../core/errors/AppError";
 import { ErrorCode } from "../../core/errors/ErrorCode";
 import { Subscriber } from "../../entities/Subscriber";
 import { Invoice } from "../../entities/Invoice";
-import { CreateSubscriptionBody, UpdateSubscriptionBody } from "../../models/SubscriptionModels";
+import { CreateSubscriptionBody, UpdateSubscriptionBody, ReorderSubscriptionsBody } from "../../models/SubscriptionModels";
 
 @Controller("/subscriptions")
 @UseBefore(AdminGuard)
@@ -34,7 +34,7 @@ export class SubscriptionsController {
     @Description("Returns all subscription plans with active subscriber counts.")
     @Returns(200)
     async list() {
-        const subs = await this.repo().find({ order: { createdAt: "DESC" } });
+        const subs = await this.repo().find({ order: { sortOrder: "ASC", createdAt: "DESC" } });
 
         const counts = await AppDataSource.getRepository(Subscriber)
             .createQueryBuilder("s")
@@ -80,6 +80,27 @@ export class SubscriptionsController {
 
         const sub = this.repo().create(data);
         return this.repo().save(sub);
+    }
+
+    @Put("/reorder")
+    @Summary("Reorder plans")
+    @Description("Reorders subscription plans by ID.")
+    @Returns(200)
+    async reorder(@BodyParams() data: ReorderSubscriptionsBody) {
+        const subs = await this.repo().find();
+        
+        for (const sub of subs) {
+            const index = data.ids.indexOf(sub.id);
+            if (index !== -1) {
+                sub.sortOrder = index;
+            } else {
+                // Keep unrecognized ids at the end
+                sub.sortOrder = 999;
+            }
+        }
+        
+        await this.repo().save(subs);
+        return { success: true };
     }
 
     @Put("/:id")

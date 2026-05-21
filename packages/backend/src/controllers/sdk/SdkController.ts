@@ -41,7 +41,7 @@ export class SdkController {
     async subscriptions() {
         return AppDataSource.getRepository(Subscription).find({
             where: { isActive: true },
-            order: { createdAt: "DESC" },
+            order: { sortOrder: "ASC", createdAt: "DESC" },
         });
     }
 

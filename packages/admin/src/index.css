@@ -1932,6 +1932,21 @@ label {
     border-color: var(--border-hover);
 }
 
+.plan-group-dragging {
+    opacity: 0.5;
+    border-color: var(--accent);
+    transform: scale(0.98);
+}
+
+.plan-group-drag-over {
+    border: 2px dashed var(--accent);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.drag-handle:hover {
+    color: var(--text-primary) !important;
+}
+
 .plan-group-header {
     display: flex;
     align-items: center;

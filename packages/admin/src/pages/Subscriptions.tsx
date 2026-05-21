@@ -2,7 +2,7 @@
 import { createSignal, createMemo, onMount, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import { api } from "../api/client";
-import { Plus, ChevronDown, ChevronUp, Users, Copy, Check, Search, X, FileText, DollarSign, RefreshCw, Tag } from "lucide-solid";
+import { Plus, ChevronDown, ChevronUp, Users, Copy, Check, Search, X, FileText, DollarSign, RefreshCw, Tag, GripVertical } from "lucide-solid";
 
 type PlanTab = "basics" | "pricing" | "billing" | "squads" | "metadata";
 
@@ -109,15 +109,76 @@ export function Subscriptions() {
         search() || filterCurrency() || filterStatus() || filterInterval()
     );
 
-    // Group by name, then sub-group by interval within each group
+    // Group by name, preserve API sort order
     const grouped = createMemo(() => {
         const groups: Record<string, any[]> = {};
+        const order: string[] = [];
         for (const sub of filtered()) {
-            if (!groups[sub.name]) groups[sub.name] = [];
+            if (!groups[sub.name]) {
+                groups[sub.name] = [];
+                order.push(sub.name);
+            }
             groups[sub.name].push(sub);
         }
-        return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+        return order.map(name => [name, groups[name]] as [string, any[]]);
     });
+
+    // Drag and Drop
+    const [draggedName, setDraggedName] = createSignal<string | null>(null);
+    const [dragOverName, setDragOverName] = createSignal<string | null>(null);
+
+    const handleDragStart = (name: string, e: DragEvent) => {
+        setDraggedName(name);
+        if (e.dataTransfer) {
+            e.dataTransfer.setData("text/plain", name);
+            e.dataTransfer.effectAllowed = "move";
+        }
+    };
+
+    const handleDragOver = (name: string, e: DragEvent) => {
+        e.preventDefault();
+        if (draggedName() !== name) {
+            setDragOverName(name);
+        }
+    };
+
+    const handleDragLeave = (name: string, e: DragEvent) => {
+        if (dragOverName() === name) {
+            setDragOverName(null);
+        }
+    };
+
+    const handleDrop = async (targetName: string, e: DragEvent) => {
+        e.preventDefault();
+        setDragOverName(null);
+        const sourceName = draggedName();
+        if (!sourceName || sourceName === targetName) {
+            setDraggedName(null);
+            return;
+        }
+
+        const currentOrder = grouped().map(g => g[0]);
+        const sourceIdx = currentOrder.indexOf(sourceName);
+        const targetIdx = currentOrder.indexOf(targetName);
+        
+        currentOrder.splice(sourceIdx, 1);
+        currentOrder.splice(targetIdx, 0, sourceName);
+        
+        const sortedItems = [...items()].sort((a, b) => {
+            return currentOrder.indexOf(a.name) - currentOrder.indexOf(b.name);
+        });
+        setItems(sortedItems);
+
+        const currentIds = sortedItems.map(p => p.id);
+
+        try {
+            await api.put("/subscriptions/reorder", { ids: currentIds });
+        } catch (err) {
+            console.error("Reorder failed", err);
+            load();
+        }
+        setDraggedName(null);
+    };
 
     // Sub-group plans by interval inside a group, returning ordered array
     const byInterval = (plans: any[]) => {
@@ -319,11 +380,24 @@ export function Subscriptions() {
                         const intervalGroups = () => byInterval(plans);
 
                         return (
-                            <div class="plan-group">
+                            <div 
+                                class={`plan-group ${dragOverName() === name ? 'plan-group-drag-over' : ''} ${draggedName() === name ? 'plan-group-dragging' : ''}`}
+                                draggable={!hasActiveFilters()}
+                                onDragStart={(e) => handleDragStart(name, e)}
+                                onDragOver={(e) => handleDragOver(name, e)}
+                                onDragLeave={(e) => handleDragLeave(name, e)}
+                                onDrop={(e) => handleDrop(name, e)}
+                            >
                                 <div class="plan-group-header" onClick={() => toggleCollapse(name)}>
-                                    <div class="plan-group-info">
-                                        <h3 class="plan-group-name">{name}</h3>
-                                        <span class="plan-group-meta">
+                                    <div class="plan-group-info" style="display: flex; align-items: center; gap: 12px;">
+                                        <Show when={!hasActiveFilters()}>
+                                            <div class="drag-handle" style="cursor: grab; color: var(--text-muted); display: flex;" onClick={(e) => e.stopPropagation()}>
+                                                <GripVertical size={16} />
+                                            </div>
+                                        </Show>
+                                        <div>
+                                            <h3 class="plan-group-name">{name}</h3>
+                                            <span class="plan-group-meta">
                                             {plans.length} {plans.length === 1 ? "variant" : "variants"}
                                             <span class="plan-group-meta-sep">·</span>
                                             {status().active} active
@@ -333,6 +407,7 @@ export function Subscriptions() {
                                                 {status().subscribers}
                                             </span>
                                         </span>
+                                        </div>
                                     </div>
                                     <div class="plan-group-header-right">
                                         <button

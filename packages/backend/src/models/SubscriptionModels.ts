@@ -7,7 +7,7 @@
  * compatibility between validated input and TypeORM entities.
  */
 
-import { Required, Optional, MinLength, MaxLength, Integer, Min, Pattern, Enum, Default, Property } from "@tsed/schema";
+import { Required, Optional, MinLength, MaxLength, Integer, Min, Pattern, Enum, Default, Property, CollectionOf } from "@tsed/schema";
 import type { SubscriptionInterval, RenewalMode } from "../entities/Subscription";
 
 const INTERVALS = ["day", "week", "month", "year", "one_time"] as const;
@@ -119,4 +119,11 @@ export class UpdateSubscriptionBody {
     @Integer()
     @Min(0)
     trialDays?: number;
+}
+
+/** Body for `PUT /api/admin/subscriptions/reorder` */
+export class ReorderSubscriptionsBody {
+    @Required()
+    @CollectionOf(String)
+    ids!: string[];
 }

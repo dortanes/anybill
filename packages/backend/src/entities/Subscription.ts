@@ -68,6 +68,10 @@ export class Subscription {
     @Column({ type: "simple-json", nullable: true })
     metadata!: Record<string, any> | null;
 
+    /** Order of the plan for UI sorting. */
+    @Column({ type: "integer", default: 0 })
+    sortOrder!: number;
+
     /** Number of free trial days. 0 = no trial available. */
     @Column({ type: "integer", default: 0 })
     trialDays!: number;
