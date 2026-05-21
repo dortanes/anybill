@@ -17,21 +17,23 @@
  *   IncomingWebhook,
  *   PaymentLink,
  *   Payment,
+ *   PaymentContext,
+ *   WebhookPayload,
  * } from "@anybill/sdk";
  *
  * class StripeProvider extends AnybillProvider {
  *   get displayName() { return "Stripe"; }
  *
  *   @CreatePaymentLink()
- *   async createLink(ctx) {
+ *   async createLink(ctx: PaymentContext) {
  *     return PaymentLink.url("https://...").id("pi_xxx");
  *   }
  *
  *   @ValidateWebhook()
- *   verify(ctx) { return true; }
+ *   verify(ctx: WebhookPayload): boolean { return true; }
  *
  *   @IncomingWebhook()
- *   async webhook(ctx) {
+ *   async webhook(ctx: WebhookPayload) {
  *     return Payment.id("pi_xxx").confirm();
  *   }
  * }
@@ -50,6 +52,9 @@ export { CreatePaymentLink, ValidateWebhook, IncomingWebhook, RefundPayment, Can
 // ─── Fluent Builders ────────────────────────────────────────────────
 export { PaymentLink, Payment } from "./builders";
 export type { PaymentLinkResult, PaymentResult, PaymentAction } from "./builders";
+
+// ─── Context Contracts ──────────────────────────────────────────────
+export type { PaymentContext, PaymentPlan, PaymentUser, WebhookPayload, RefundContext } from "./contexts";
 
 // ─── Registry (internal, but needed for cross-module compatibility) ─
 export { registerMethod, hasMethod, getMethodForRole, getRegisteredRoles } from "./ProviderRegistry";

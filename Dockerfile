@@ -23,7 +23,7 @@ RUN pnpm deploy --filter=@anybill/backend --prod --legacy /app/deploy
 # ─── Production Stage ────────────────────────────────
 FROM node:20-alpine
 
-RUN apk add --no-cache caddy
+RUN apk add --no-cache caddy && corepack enable && corepack prepare pnpm@10.33.2 --activate
 
 WORKDIR /app
 

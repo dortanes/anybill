@@ -28,24 +28,37 @@ import { Logger } from "@tsed/logger";
 
 // ─── Public Interfaces ──────────────────────────────────────────────
 
-/** Context passed to `@CreatePaymentLink()` methods. */
+/**
+ * Context passed to `@CreatePaymentLink()` methods.
+ * Structural equivalent of `PaymentContext` from `@anybill/sdk`.
+ */
 export interface PaymentContext {
-    /** Subscription plan data (shape defined by the application). */
-    plan: unknown;
-    /** Optional user/subscriber data. */
-    user?: unknown;
-    /** Arbitrary metadata to forward to the provider. */
+    plan: {
+        id: string;
+        name: string;
+        description: string | null;
+        amount: number;
+        currency: string;
+        interval: "day" | "week" | "month" | "year" | "one_time";
+        intervalCount: number;
+        invoiceId: string;
+        metadata: Record<string, any> | null;
+    };
+    user: {
+        uid: string;
+        subscriberId: string;
+    };
     metadata?: Record<string, any>;
 }
 
-/** Raw webhook data passed to `@ValidateWebhook()` and `@IncomingWebhook()` methods. */
+/**
+ * Raw webhook data passed to `@ValidateWebhook()` and `@IncomingWebhook()` methods.
+ * Structural equivalent of `WebhookPayload` from `@anybill/sdk`.
+ */
 export interface WebhookPayload {
-    /** Raw request body (string or Buffer). */
     body: string | Buffer;
-    /** HTTP headers from the incoming request. */
     headers: Record<string, string>;
 }
-
 /** Serializable provider info returned by {@link BillingEngine.getProviders}. */
 export interface ProviderInfo {
     /** Unique provider identifier (registration key). */

@@ -30,7 +30,7 @@
  *
  * class MyProvider extends AnybillProvider {
  *   @CreatePaymentLink()
- *   async createLink(ctx) {
+ *   async createLink(ctx: PaymentContext) {
  *     return PaymentLink.url("https://...").id("inv_123");
  *   }
  * }
@@ -49,3 +49,4 @@ export type { ProviderCapability } from "./provider/AnybillProvider";
 export { CreatePaymentLink, ValidateWebhook, IncomingWebhook, RefundPayment, CancelPayment } from "./provider/decorators";
 export { PaymentLink, Payment } from "./provider/builders";
 export type { PaymentLinkResult, PaymentResult, PaymentAction } from "./provider/builders";
+export type { PaymentContext, PaymentPlan, PaymentUser, WebhookPayload, RefundContext } from "./provider/contexts";
