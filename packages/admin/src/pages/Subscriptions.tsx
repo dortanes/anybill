@@ -501,7 +501,7 @@ export function Subscriptions() {
                                                                                 <Show when={sub.squadEnabled}>
                                                                                     <span class="badge badge-info">Squad{sub.squadMaxMembers ? ` · ${sub.squadMaxMembers}` : ""}</span>
                                                                                 </Show>
-                                                                                <Show when={sub.renewalMode === "provider_managed"}>
+                                                                                <Show when={sub.renewalMode === "auto"}>
                                                                                     <span class="badge badge-info">Auto-renew</span>
                                                                                 </Show>
                                                                                 <span class={`badge ${sub.isActive ? "badge-active" : "badge-expired"}`}>
@@ -772,14 +772,14 @@ export function Subscriptions() {
                                                 <input
                                                     type="radio"
                                                     name="renewalMode"
-                                                    value="provider_managed"
-                                                    checked={form().renewalMode === "provider_managed"}
+                                                    value="auto"
+                                                    checked={form().renewalMode === "auto"}
                                                     disabled={form().interval === "one_time"}
-                                                    onChange={() => setForm({ ...form(), renewalMode: "provider_managed" })}
+                                                    onChange={() => setForm({ ...form(), renewalMode: "auto" })}
                                                 />
                                                 <div class="renewal-radio-content">
-                                                    <span class="renewal-radio-title">Provider-managed</span>
-                                                    <span class="renewal-radio-desc">Provider handles recurring automatically</span>
+                                                    <span class="renewal-radio-title">Auto-renew</span>
+                                                    <span class="renewal-radio-desc">Auto-renew if provider supports recurring, otherwise manual</span>
                                                 </div>
                                             </label>
                                         </div>

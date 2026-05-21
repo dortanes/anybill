@@ -19,13 +19,17 @@ import { Invoice } from "./Invoice";
 export type SubscriptionInterval = "day" | "week" | "month" | "year" | "one_time";
 
 /**
- * How subscription renewal is handled after the current period ends.
+ * Admin intent for how subscription renewal should be handled.
  *
- * - `"manual"` — User must re-purchase when the period expires.
- * - `"provider_managed"` — The payment provider handles recurring billing
- *   and sends renewal webhooks to AnyBill.
+ * - `"manual"` — User must always re-purchase when the period expires,
+ *   even if the provider supports recurring billing.
+ * - `"auto"` — Auto-renew if the provider supports recurring billing.
+ *   If the provider only supports one-time payments, falls back to manual.
+ *
+ * The actual renewal mode for each subscriber is determined at payment
+ * time and stored on the Subscriber entity.
  */
-export type RenewalMode = "manual" | "provider_managed";
+export type RenewalMode = "manual" | "auto";
 
 @Entity()
 export class Subscription {

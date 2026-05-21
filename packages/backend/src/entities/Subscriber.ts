@@ -63,6 +63,21 @@ export class Subscriber {
     @Column({ type: "datetime", nullable: true })
     trialEnd!: Date | null;
 
+    /**
+     * Actual renewal mode for this subscriber, determined at payment time.
+     *
+     * - `"manual"` — subscriber must re-purchase when the period expires.
+     * - `"provider_managed"` — the provider handles recurring billing automatically.
+     *
+     * Derived from the plan's `renewalMode` intent + the provider's capabilities.
+     */
+    @Column({ type: "varchar", default: "manual" })
+    renewalMode!: "manual" | "provider_managed";
+
+    /** Payment provider used for the current subscription period (e.g. `"stripe"`, `"freekassa"`). */
+    @Column({ type: "varchar", nullable: true })
+    provider!: string | null;
+
     /** Payment invoices for this subscriber. */
     @OneToMany(() => Invoice, (i) => i.subscriber)
     invoices!: Invoice[];

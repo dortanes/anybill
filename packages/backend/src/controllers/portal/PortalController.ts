@@ -185,6 +185,8 @@ export class PortalController {
                         currentPeriodStart: owner.currentPeriodStart,
                         currentPeriodEnd: owner.currentPeriodEnd,
                         trialEnd: owner.trialEnd,
+                        renewalMode: owner.renewalMode,
+                        provider: owner.provider,
                     },
                     invoices: [],
                     availablePlans: [],
@@ -230,6 +232,8 @@ export class PortalController {
                       currentPeriodStart: subscriber.currentPeriodStart,
                       currentPeriodEnd: subscriber.currentPeriodEnd,
                       trialEnd: subscriber.trialEnd,
+                      renewalMode: subscriber.renewalMode,
+                      provider: subscriber.provider,
                   }
                 : null,
             invoices: invoices.map((inv) => ({

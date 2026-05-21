@@ -11,7 +11,7 @@ import { Required, Optional, MinLength, MaxLength, Integer, Min, Pattern, Enum, 
 import type { SubscriptionInterval, RenewalMode } from "../entities/Subscription";
 
 const INTERVALS = ["day", "week", "month", "year", "one_time"] as const;
-const RENEWAL_MODES = ["manual", "provider_managed"] as const;
+const RENEWAL_MODES = ["manual", "auto"] as const;
 
 /** Body for `POST /api/admin/subscriptions` — create a subscription plan. */
 export class CreateSubscriptionBody {

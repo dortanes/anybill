@@ -23,6 +23,12 @@ export interface Subscription {
     squadMaxMembers: number;
     /** Number of free trial days. 0 = no trial. */
     trialDays: number;
+    /**
+     * Admin intent for renewal handling.
+     * - `"manual"` — always manual, even if provider supports recurring.
+     * - `"auto"` — auto-renew if provider supports it, otherwise manual.
+     */
+    renewalMode: "manual" | "auto";
 }
 
 /** Subscriber (a user with an active or past subscription). */
@@ -37,6 +43,14 @@ export interface Subscriber {
     currentPeriodEnd: string | null;
     trialEnd: string | null;
     metadata: Record<string, any> | null;
+    /**
+     * Actual renewal mode determined at payment time.
+     * - `"manual"` — subscriber must re-purchase when period expires.
+     * - `"provider_managed"` — provider handles recurring billing automatically.
+     */
+    renewalMode: "manual" | "provider_managed";
+    /** Payment provider used for the current subscription period. */
+    provider: string | null;
 }
 
 /** Payment invoice. */

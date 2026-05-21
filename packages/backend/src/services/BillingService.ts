@@ -50,7 +50,7 @@ export class BillingService implements OnInit {
             this.engine.provider(name, provider);
         }
 
-        this.engine.on("payment:confirmed", ({ payment }) => this.onPaymentConfirmed(payment.id, payment.metadata));
+        this.engine.on("payment:confirmed", ({ provider, payment }) => this.onPaymentConfirmed(payment.id, provider, payment.metadata));
         this.engine.on("payment:failed", ({ payment }) => this.onPaymentFailed(payment.id));
         this.engine.on("payment:refunded", ({ payment }) => this.onPaymentRefunded(payment.id));
         this.engine.on("payment:renewed", ({ provider, payment }) => this.onPaymentRenewed(payment.id, provider, payment.metadata));
@@ -395,8 +395,8 @@ export class BillingService implements OnInit {
 
     // ─── Event Handlers ─────────────────────────────────────────
 
-    /** Handle a confirmed payment: mark invoice as paid, activate subscriber. */
-    private async onPaymentConfirmed(providerInvoiceId: string, metadata?: Record<string, any>): Promise<void> {
+    /** Handle a confirmed payment: mark invoice as paid, activate subscriber, determine renewal mode. */
+    private async onPaymentConfirmed(providerInvoiceId: string, providerName: string, metadata?: Record<string, any>): Promise<void> {
         const invoiceRepo = AppDataSource.getRepository(Invoice);
         const subscriberRepo = AppDataSource.getRepository(Subscriber);
 
@@ -428,6 +428,17 @@ export class BillingService implements OnInit {
             if (subscription && subscription.interval !== "one_time") {
                 subscriber.currentPeriodEnd = computePeriodEnd(subscription.interval, subscription.intervalCount);
             }
+
+            // Determine actual renewal mode based on plan intent + provider capabilities.
+            subscriber.provider = providerName;
+            if (subscription && subscription.renewalMode === "auto" && subscription.interval !== "one_time") {
+                const providerInfo = this.engine.getProviders().find(p => p.id === providerName);
+                const supportsRecurring = providerInfo?.capabilities.includes("recurring") ?? false;
+                subscriber.renewalMode = supportsRecurring ? "provider_managed" : "manual";
+            } else {
+                subscriber.renewalMode = "manual";
+            }
+
             await subscriberRepo.save(subscriber);
 
             // Auto-create squad for squad-enabled plans.
@@ -569,6 +580,8 @@ export class BillingService implements OnInit {
         subscriber.status = "active";
         subscriber.currentPeriodStart = new Date();
         subscriber.currentPeriodEnd = computePeriodEnd(subscription.interval, subscription.intervalCount);
+        subscriber.provider = providerName;
+        subscriber.renewalMode = "provider_managed";
         await subscriberRepo.save(subscriber);
 
         await this.outgoingWebhooks.dispatch("subscription.renewed", {

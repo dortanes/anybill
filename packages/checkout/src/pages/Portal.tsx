@@ -44,6 +44,8 @@ interface SubscriberInfo {
     status: string;
     currentPeriodStart: string | null;
     currentPeriodEnd: string | null;
+    renewalMode?: string;
+    provider?: string | null;
 }
 
 interface InvoiceInfo {
@@ -228,7 +230,10 @@ export function PortalPage() {
     const canRenew = () => {
         if (isMember()) return false;
         const sub = data()?.subscriber;
-        return sub ? ["expired", "past_due", "cancelled"].includes(sub.status) && sub.subscription.interval !== "one_time" : false;
+        if (!sub) return false;
+        if (sub.subscription.interval === "one_time") return false;
+        if (sub.renewalMode === "provider_managed") return false;
+        return ["expired", "past_due", "cancelled"].includes(sub.status);
     };
 
     const canChange = () => {
