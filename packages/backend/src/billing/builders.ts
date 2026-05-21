@@ -129,11 +129,12 @@ export interface PaymentResult {
     metadata?: Record<string, any>;
     /**
      * Optional raw body to return verbatim to the webhook caller.
-     * Set via `Payment.ignore(body)`. Can be a string, Uint8Array, or any
-     * JSON-serialisable value. When present, the webhook controller
-     * responds with this value directly instead of the default JSON envelope.
+     * Set via `Payment.ignore(body)` or `Payment.id(...).confirm(body)`.
+     * Can be a string, Uint8Array, or any JSON-serialisable value.
+     * When present, the webhook controller responds with this value
+     * directly instead of the default JSON envelope.
      */
-    ignoreBody?: string | Uint8Array | Record<string, any> | unknown;
+    responseBody?: string | Uint8Array | Record<string, any> | unknown;
 }
 
 /**
@@ -191,7 +192,7 @@ export class Payment {
      * return Payment.ignore({ challenge: params.hub_challenge });
      */
     static ignore(body?: string | Uint8Array | Record<string, any> | unknown): PaymentResult {
-        return { id: "", action: "ignored", ...(body !== undefined && { ignoreBody: body }) };
+        return { id: "", action: "ignored", ...(body !== undefined && { responseBody: body }) };
     }
 
     /**
@@ -204,9 +205,14 @@ export class Payment {
         return this;
     }
 
-    /** Finalize as a confirmed payment. */
-    confirm(): PaymentResult {
-        return { id: this._id, action: "confirmed", metadata: this._metadata };
+    /**
+     * Finalize as a confirmed payment.
+     *
+     * @param body - Optional response body to echo back verbatim to the
+     *               webhook caller (string, Uint8Array, or JSON object).
+     */
+    confirm(body?: string | Uint8Array | Record<string, any> | unknown): PaymentResult {
+        return { id: this._id, action: "confirmed", metadata: this._metadata, ...(body !== undefined && { responseBody: body }) };
     }
 
     /** Finalize as a failed payment. */

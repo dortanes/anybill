@@ -42,9 +42,10 @@ export class WebhookController {
             const rawBody: Buffer | string = (req as any).rawBody ?? req.body;
             const result = await this.billing.handleWebhook(provider, rawBody, req.headers);
 
-            // If the provider returned an explicit ignore body, echo it verbatim.
-            if (result?.ignoreBody !== undefined) {
-                const body = result.ignoreBody;
+            // If the provider returned an explicit response body, echo it verbatim.
+            // Works for any action: ignore(body), confirm(body), etc.
+            if (result?.responseBody !== undefined) {
+                const body = result.responseBody;
                 if (typeof body === "string" || Buffer.isBuffer(body) || body instanceof Uint8Array) {
                     return res.send(body);
                 }

@@ -38,8 +38,8 @@ export interface PaymentResult {
     id: string;
     action: PaymentAction;
     metadata?: Record<string, any>;
-    /** Optional body to echo back verbatim to the webhook caller (set via `Payment.ignore(body)`). */
-    ignoreBody?: string | Uint8Array | Record<string, any> | unknown;
+    /** Optional body to echo back verbatim to the webhook caller (set via `Payment.ignore(body)` or `.confirm(body)`). */
+    responseBody?: string | Uint8Array | Record<string, any> | unknown;
 }
 
 export class Payment {
@@ -53,11 +53,11 @@ export class Payment {
     }
 
     static ignore(body?: string | Uint8Array | Record<string, any> | unknown): PaymentResult {
-        return { id: "", action: "ignored", ...(body !== undefined && { ignoreBody: body }) };
+        return { id: "", action: "ignored", ...(body !== undefined && { responseBody: body }) };
     }
 
     metadata(meta: Record<string, any>): this { this._metadata = meta; return this; }
-    confirm(): PaymentResult { return { id: this._id, action: "confirmed", metadata: this._metadata }; }
+    confirm(body?: string | Uint8Array | Record<string, any> | unknown): PaymentResult { return { id: this._id, action: "confirmed", metadata: this._metadata, ...(body !== undefined && { responseBody: body }) }; }
     failure(): PaymentResult { return { id: this._id, action: "failed", metadata: this._metadata }; }
     cancel(): PaymentResult { return { id: this._id, action: "cancelled", metadata: this._metadata }; }
     refund(): PaymentResult { return { id: this._id, action: "refunded", metadata: this._metadata }; }
