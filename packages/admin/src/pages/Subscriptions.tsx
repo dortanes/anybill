@@ -55,11 +55,21 @@ export function Subscriptions() {
     // Two levels of collapse: plan group + interval sub-group
     const [collapsed, setCollapsed] = createSignal<Record<string, boolean>>({});
     const [collapsedInterval, setCollapsedInterval] = createSignal<Record<string, boolean>>({});
-    const [form, setForm] = createSignal({ name: "", description: "", displayAmount: "", currency: "USD", interval: "month", intervalCount: "1", squadEnabled: false, squadMaxMembers: "0", trialDays: "0" });
+    const [form, setForm] = createSignal({ name: "", description: "", displayAmount: "", currency: "USD", interval: "month", intervalCount: "1", squadEnabled: false, squadMaxMembers: "0", trialDays: "0", syncSquadToVariants: false });
     const [metaRows, setMetaRows] = createStore<{ key: string; value: string }[]>([]);
     const [formError, setFormError] = createSignal("");
     const [saving, setSaving] = createSignal(false);
     const [planTab, setPlanTab] = createSignal<PlanTab>("basics");
+
+    /** True when other plans share the same name as the current form. */
+    const hasVariants = () => {
+        const name = form().name.trim();
+        if (!name) return false;
+        const sameNameCount = items().filter((s: any) => s.name === name).length;
+        // When editing: need at least 2 plans with same name (current + others)
+        // When creating: need at least 1 existing plan with same name
+        return editing() ? sameNameCount >= 2 : sameNameCount >= 1;
+    };
 
     // Filters
     const [search, setSearch] = createSignal("");
@@ -204,7 +214,7 @@ export function Subscriptions() {
 
     const openCreate = (prefillName?: string) => {
         setEditing(null);
-        setForm({ name: prefillName || "", description: "", displayAmount: "", currency: "USD", interval: "month", intervalCount: "1", squadEnabled: false, squadMaxMembers: "0", trialDays: "0" });
+        setForm({ name: prefillName || "", description: "", displayAmount: "", currency: "USD", interval: "month", intervalCount: "1", squadEnabled: false, squadMaxMembers: "0", trialDays: "0", syncSquadToVariants: false });
         setMetaRows([]);
         setFormError("");
         setPlanTab("basics");
@@ -223,6 +233,7 @@ export function Subscriptions() {
             squadEnabled: sub.squadEnabled || false,
             squadMaxMembers: String(sub.squadMaxMembers || 0),
             trialDays: String(sub.trialDays || 0),
+            syncSquadToVariants: false,
         });
         const meta = sub.metadata && typeof sub.metadata === "object" ? sub.metadata : {};
         setMetaRows(Object.entries(meta).map(([key, value]) => ({ key, value: String(value) })));
@@ -255,6 +266,7 @@ export function Subscriptions() {
                 squadEnabled: form().squadEnabled,
                 squadMaxMembers: Number(form().squadMaxMembers),
                 trialDays: form().interval === "one_time" ? 0 : Number(form().trialDays || 0),
+                syncSquadToVariants: form().syncSquadToVariants,
             };
             if (hasMetadata) body.metadata = metadata;
             if (editing()) {
@@ -788,6 +800,17 @@ export function Subscriptions() {
                                             />
                                             <div class="form-hint">Members excluding the owner. Set to 0 for unlimited.</div>
                                         </div>
+
+                                        <Show when={hasVariants()}>
+                                            <label class="toggle-row sync-variants-toggle">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form().syncSquadToVariants}
+                                                    onChange={(e) => setForm({ ...form(), syncSquadToVariants: e.target.checked })}
+                                                />
+                                                <span class="sync-variants-label">Apply to all variants</span>
+                                            </label>
+                                        </Show>
                                     </Show>
 
                                     <Show when={!form().squadEnabled}>

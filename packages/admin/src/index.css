@@ -1444,6 +1444,31 @@ label {
     opacity: 0.25;
 }
 
+/* Sync to variants toggle */
+.sync-variants-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(99, 179, 237, 0.06);
+    border: 1px solid rgba(99, 179, 237, 0.15);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+}
+
+.sync-variants-toggle:hover {
+    background: rgba(99, 179, 237, 0.1);
+    border-color: rgba(99, 179, 237, 0.25);
+}
+
+.sync-variants-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
 /* Metadata empty + add button */
 .plan-meta-empty {
     display: flex;

@@ -77,8 +77,17 @@ export class SubscriptionsController {
             data.trialDays = 0;
         }
 
+        const syncSquad = data.syncSquadToVariants;
+        delete (data as any).syncSquadToVariants;
+
         const sub = this.repo().create(data);
-        return this.repo().save(sub);
+        const saved = await this.repo().save(sub);
+
+        if (syncSquad) {
+            await this.syncSquadSettings(saved.name, saved.id, saved.squadEnabled, saved.squadMaxMembers);
+        }
+
+        return saved;
     }
 
     @Put("/reorder")
@@ -117,6 +126,8 @@ export class SubscriptionsController {
             data.trialDays = 0;
         }
 
+        const syncSquad = data.syncSquadToVariants;
+
         if (data.name !== undefined) sub.name = data.name;
         if (data.description !== undefined) sub.description = data.description;
         if (data.amount !== undefined) sub.amount = data.amount;
@@ -129,7 +140,13 @@ export class SubscriptionsController {
         if (data.squadMaxMembers !== undefined) sub.squadMaxMembers = data.squadMaxMembers;
         if (data.trialDays !== undefined) sub.trialDays = data.trialDays;
 
-        return this.repo().save(sub);
+        const saved = await this.repo().save(sub);
+
+        if (syncSquad) {
+            await this.syncSquadSettings(saved.name, saved.id, saved.squadEnabled, saved.squadMaxMembers);
+        }
+
+        return saved;
     }
 
     /**
@@ -164,5 +181,17 @@ export class SubscriptionsController {
         await this.repo().remove(sub);
 
         return { deleted: true };
+    }
+
+    /**
+     * Sync squad settings to all other plans with the same name.
+     */
+    private async syncSquadSettings(name: string, excludeId: string, squadEnabled: boolean, squadMaxMembers: number) {
+        await this.repo()
+            .createQueryBuilder()
+            .update()
+            .set({ squadEnabled, squadMaxMembers })
+            .where("name = :name AND id != :excludeId", { name, excludeId })
+            .execute();
     }
 }

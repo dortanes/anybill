@@ -62,6 +62,10 @@ export class CreateSubscriptionBody {
     @Min(0)
     @Default(0)
     trialDays!: number;
+
+    @Optional()
+    @Default(false)
+    syncSquadToVariants?: boolean;
 }
 
 /** Body for `PUT /api/admin/subscriptions/:id` — update a subscription plan. */
@@ -113,6 +117,9 @@ export class UpdateSubscriptionBody {
     @Integer()
     @Min(0)
     trialDays?: number;
+
+    @Optional()
+    syncSquadToVariants?: boolean;
 }
 
 /** Body for `PUT /api/admin/subscriptions/reorder` */
