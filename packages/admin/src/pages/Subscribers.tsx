@@ -104,7 +104,7 @@ export function Subscribers() {
     const closeDetail = () => { setSelected(null); setDetail(null); };
 
     const cancel = async (id: string) => {
-        if (!confirm("Cancel this subscription?")) return;
+        if (!confirm("Cancel this subscription? The subscriber keeps access until the current period ends.")) return;
         try {
             await api.post(`/subscribers/${id}/cancel`);
             closeDetail();
@@ -122,9 +122,9 @@ export function Subscribers() {
     };
 
     const revoke = async (id: string) => {
-        if (!confirm("Revoke access immediately? The subscriber status will be set to cancelled.")) return;
+        if (!confirm("Revoke access immediately? This will cancel the subscription and clear the billing period dates right now.")) return;
         try {
-            await api.put(`/subscribers/${id}`, { status: "cancelled" });
+            await api.post(`/subscribers/${id}/revoke`);
             closeDetail();
             load();
         } catch (err: any) { alert(err.message); }

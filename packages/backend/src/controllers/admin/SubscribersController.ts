@@ -226,6 +226,27 @@ export class SubscribersController {
         return this.repo().save(sub);
     }
 
+    /**
+     * Revoke a subscriber's access immediately.
+     *
+     * Sets status to `cancelled` and clears billing period dates so the
+     * subscriber loses access right away (unlike `cancel`, which keeps the
+     * period end date for grace access until it expires).
+     */
+    @Post("/:id/revoke")
+    @Summary("Revoke subscriber access")
+    @Description("Immediately revokes access by setting status to cancelled and clearing billing period dates.")
+    @Returns(200)
+    @Returns(404)
+    async revoke(@PathParams("id") id: string) {
+        const sub = await this.repo().findOneBy({ id });
+        if (!sub) throw new AppError(404, ErrorCode.SUBSCRIBER_NOT_FOUND, "Subscriber not found");
+        sub.status = "cancelled";
+        sub.currentPeriodStart = null as any;
+        sub.currentPeriodEnd = null as any;
+        return this.repo().save(sub);
+    }
+
     /** Refund an active subscriber's latest paid invoice. */
     @Post("/:id/refund")
     @Summary("Refund subscriber")
