@@ -36,7 +36,11 @@ export class WebhookController {
         @Context() ctx: any,
     ) {
         try {
-            const result = await this.billing.handleWebhook(provider, req.body, req.headers);
+            // Use the raw body Buffer for signature verification.
+            // express.json() with the `verify` callback saves the original bytes on req.rawBody.
+            // If rawBody is missing (empty body), fall back to req.body.
+            const rawBody: Buffer | string = (req as any).rawBody ?? req.body;
+            const result = await this.billing.handleWebhook(provider, rawBody, req.headers);
             return res.json({ ok: true, action: result?.action ?? "ignored" });
         } catch (err: any) {
             ctx.logger.error({ provider, error: err.message });

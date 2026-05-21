@@ -135,7 +135,14 @@ import "../services/InvoiceExpirationWorker";
             ],
             credentials: true,
         }),
-        express.json(),
+        express.json({
+            verify: (req: any, _res, buf) => {
+                // Preserve the raw request body (as Buffer) for webhook signature verification.
+                // Providers need the original bytes — once parsed to an object, HMAC can't be recomputed.
+                req.rawBody = buf;
+            },
+        }),
+        express.text({ type: "text/plain" }),
         express.urlencoded({ extended: true }),
     ],
     logger: {
