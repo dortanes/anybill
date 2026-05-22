@@ -121,17 +121,13 @@ export function SecureCheckout() {
                 if (!translated || translated.includes("apiErrors.")) translated = code;
                 throw new Error(translated);
             }
-            const { paymentUrl, invoiceId } = await res.json();
-
-            // Tell embed overlay to hide the close button during provider redirect.
-            if (window.parent !== window) {
-                window.parent.postMessage({ type: "anybill:checkout:paying" }, "*");
-            }
+            const { paymentUrl } = await res.json();
 
             // Redirect to the provider's payment gateway.
+            // Use top-level navigation so the provider page is not trapped
+            // inside an iframe (many providers block this via CSRF / X-Frame-Options).
             // After payment the provider redirects back to /pay/confirm/:invoiceId.
-            // In embed mode the confirm page sends postMessage to close the overlay.
-            window.location.href = paymentUrl;
+            (window.top || window).location.href = paymentUrl;
         } catch (err: any) {
             setError(err.message);
             setLoading(false);

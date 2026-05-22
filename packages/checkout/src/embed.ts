@@ -230,11 +230,6 @@
             setTimeout(close, 1500);
         }
 
-        if (data.type === "anybill:checkout:paying") {
-            const closeBtn = document.querySelector(`#${OVERLAY_ID} .anybill-close`) as HTMLElement | null;
-            if (closeBtn) closeBtn.style.display = "none";
-        }
-
         if (data.type === "anybill:checkout:close") {
             close();
         }
