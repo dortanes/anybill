@@ -20,7 +20,7 @@ function resolveDisplayName(name: string | Record<string, string>, lang: string)
 }
 
 export function SecureCheckout() {
-    const { t, locale, formatPrice, intervalLabel } = useI18n();
+    const { t, locale, formatPrice, intervalLabel, formatDate } = useI18n();
     const params = useParams<{ token: string }>();
     const [info, setInfo] = createSignal<any>(null);
     const [selectedProvider, setSelectedProvider] = createSignal("");
@@ -310,6 +310,18 @@ export function SecureCheckout() {
 
                             <Show when={error()}>
                                 <div class="error-msg">{error()}</div>
+                            </Show>
+
+                            <Show when={info().existingSubscription}>
+                                <div class="checkout-warning">
+                                    <AlertTriangle size={16} />
+                                    <div>
+                                        {t("checkout.existingSubWarning", {
+                                            name: info().existingSubscription.name,
+                                            date: formatDate(info().existingSubscription.currentPeriodEnd),
+                                        })}
+                                    </div>
+                                </div>
                             </Show>
 
                             <div class="payment-section-label">{t("checkout.paymentMethod")}</div>

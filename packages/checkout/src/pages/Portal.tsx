@@ -3,10 +3,11 @@
  *
  * Uses the same two-column Stripe-style layout as SecureCheckout.
  * Left column: subscription info + payment history.
- * Right column: actions (cancel, change plan, renew).
+ * Right column: actions (cancel, renew).
  *
- * For payments (change/renew), the portal redirects to the standard
- * checkout page — provider selection happens there, not here.
+ * For renewals, the portal redirects to the standard checkout page —
+ * provider selection happens there, not here.
+ * Plan changes are handled by the product's own UI via SDK checkout links.
  */
 import { createSignal, onMount, For, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
@@ -16,7 +17,6 @@ import {
     XCircle,
     Clock,
     CreditCard,
-    ArrowRightLeft,
     RefreshCw,
     Lock,
     X,
@@ -57,23 +57,12 @@ interface InvoiceInfo {
     createdAt: string;
 }
 
-interface PlanInfo {
-    id: string;
-    name: string;
-    description: string | null;
-    amount: number;
-    currency: string;
-    interval: string;
-    intervalCount: number;
-}
-
 interface PortalData {
     uid: string;
     role: "direct" | "owner" | "member";
     squad: { id: string; maxMembers: number; memberCount: number; ownerUid?: string } | null;
     subscriber: SubscriberInfo | null;
     invoices: InvoiceInfo[];
-    availablePlans: PlanInfo[];
     checkoutConfig: Record<string, any>;
 }
 
@@ -108,12 +97,7 @@ export function PortalPage() {
 
     // Modal state
     const [showCancelModal, setShowCancelModal] = createSignal(false);
-    const [showChangeModal, setShowChangeModal] = createSignal(false);
     const [showRenewModal, setShowRenewModal] = createSignal(false);
-    const [selectedPlan, setSelectedPlan] = createSignal("");
-    // Change plan: step 1 = pick plan name, step 2 = pick variant
-    const [changePlanStep, setChangePlanStep] = createSignal<1 | 2>(1);
-    const [selectedGroupName, setSelectedGroupName] = createSignal("");
 
     // ─── Load Data ──────────────────────────────────────────────
 
@@ -163,35 +147,6 @@ export function PortalPage() {
         finally { setActionLoading(false); }
     };
 
-    const changePlan = async () => {
-        const d = data();
-        if (!d?.subscriber || !selectedPlan()) return;
-        setActionLoading(true);
-        setActionError("");
-        try {
-            const res = await fetch(`${API}/change`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    token: params.token,
-                    subscriberId: d.subscriber.id,
-                    newSubscriptionId: selectedPlan(),
-                }),
-            });
-            if (!res.ok) { 
-                const err = await res.json().catch(() => ({})); 
-                const code = err.errorCode || err.message || "Unknown error";
-                let tError = t(`apiErrors.${code}` as any);
-                if (!tError || tError.includes("apiErrors.")) tError = code;
-                throw new Error(tError);
-            }
-            const { checkoutUrl } = await res.json();
-            window.location.href = checkoutUrl;
-        } catch (err: any) {
-            setActionError(err.message);
-            setActionLoading(false);
-        }
-    };
 
     const renewSubscription = async () => {
         const d = data();
@@ -226,7 +181,12 @@ export function PortalPage() {
     const canCancel = () => {
         if (isMember()) return false;
         const sub = data()?.subscriber;
-        return sub ? sub.status === "active" && sub.subscription.interval !== "one_time" : false;
+        if (!sub) return false;
+        // No point cancelling a one-time purchase
+        if (sub.subscription.interval === "one_time") return false;
+        // Manual renewal = no auto-charge, subscription expires on its own
+        if (sub.renewalMode === "manual") return false;
+        return sub.status === "active";
     };
 
     const canRenew = () => {
@@ -238,47 +198,6 @@ export function PortalPage() {
         return ["expired", "past_due", "cancelled"].includes(sub.status);
     };
 
-    const canChange = () => {
-        if (isMember()) return false;
-        const sub = data()?.subscriber;
-        return sub ? sub.subscription.interval !== "one_time" : false;
-    };
-
-    const changePlans = () => {
-        const d = data();
-        if (!d?.subscriber) return [];
-        return d.availablePlans.filter((p) => p.id !== d.subscriber!.subscription.id);
-    };
-
-    // Group ALL available plans by name (including current, so we can show it as selected)
-    const planGroups = () => {
-        const d = data();
-        if (!d) return [];
-        const map = new Map<string, PlanInfo[]>();
-        for (const p of d.availablePlans) {
-            if (!map.has(p.name)) map.set(p.name, []);
-            map.get(p.name)!.push(p);
-        }
-        return [...map.entries()].map(([name, variants]) => ({ name, variants }));
-    };
-
-    const currentPlanName = () => data()?.subscriber?.subscription.name ?? "";
-
-    // Flat list of variants for step 2 (all intervals × currencies)
-    const selectedGroupVariants = () => {
-        const d = data();
-        if (!d) return [];
-        const g = planGroups().find(g => g.name === selectedGroupName());
-        return g ? g.variants : [];
-    };
-
-    const openChangeModal = () => {
-        setSelectedPlan("");
-        setSelectedGroupName("");
-        setChangePlanStep(1);
-        setActionError("");
-        setShowChangeModal(true);
-    };
 
     return (
         <>
@@ -439,21 +358,6 @@ export function PortalPage() {
                                                     </div>
                                                 </div>
                                             </Show>
-                                            {/* Active recurring: can change plan or cancel */}
-                                            <Show when={canChange() && changePlans().length > 0}>
-                                                <button
-                                                    class="portal-action-card"
-                                                    onClick={() => { openChangeModal(); }}
-                                                >
-                                                    <div class="portal-action-icon">
-                                                        <ArrowRightLeft size={20} />
-                                                    </div>
-                                                    <div class="portal-action-content">
-                                                        <div class="portal-action-title">{t("portal.changePlan")}</div>
-                                                        <div class="portal-action-desc">{t("portal.changePlanDesc")}</div>
-                                                    </div>
-                                                </button>
-                                            </Show>
 
                                             <Show when={canRenew()}>
                                                 <button
@@ -494,8 +398,8 @@ export function PortalPage() {
                                                 </div>
                                             </Show>
 
-                                            {/* Cancelled + no change plans */}
-                                            <Show when={sub.status === "cancelled" && !canRenew() && changePlans().length === 0}>
+                                            {/* Cancelled with no available actions */}
+                                            <Show when={sub.status === "cancelled" && !canRenew()}>
                                                 <div class="portal-no-actions">
                                                     {t("portal.cancelledNoActions")}
                                                 </div>
@@ -542,110 +446,6 @@ export function PortalPage() {
                 </div>
             </Show>
 
-            {/* ─── Change Plan Modal ───────────────────────────── */}
-            <Show when={showChangeModal()}>
-                <div class="portal-overlay" onClick={() => setShowChangeModal(false)}>
-                    <div class="portal-modal portal-modal-lg" onClick={(e) => e.stopPropagation()}>
-                        <button class="portal-modal-close" onClick={() => setShowChangeModal(false)}>
-                            <X size={18} />
-                        </button>
-
-                        {/* Step 1 — pick a plan group */}
-                        <Show when={changePlanStep() === 1}>
-                            <div class="portal-modal-title">{t("portal.changeTitle")}</div>
-                            <div class="portal-modal-desc">{t("portal.changePlanModalDesc")}</div>
-
-                            <div class="portal-plan-list">
-                                <For each={planGroups()}>
-                                    {(group) => {
-                                        const isCurrent = group.name === currentPlanName();
-                                        return (
-                                            <button
-                                                class={`portal-plan-card ${
-                                                    isCurrent ? "portal-plan-card-current" : ""
-                                                }`}
-                                                onClick={() => {
-                                                    setSelectedGroupName(group.name);
-                                                    // If only 1 variant — pick it directly
-                                                    if (group.variants.length === 1) {
-                                                        setSelectedPlan(group.variants[0].id);
-                                                    } else {
-                                                        setSelectedPlan("");
-                                                    }
-                                                    setChangePlanStep(2);
-                                                }}
-                                            >
-                                                <div class="portal-plan-card-header">
-                                                    <div class="portal-plan-card-name">{group.name}</div>
-                                                    <Show when={isCurrent}>
-                                                        <span class="portal-plan-card-badge">{t("portal.currentPlan")}</span>
-                                                    </Show>
-                                                </div>
-                                                <div class="portal-plan-card-variants">
-                                                    {group.variants.length === 1
-                                                        ? `${formatPrice(group.variants[0].amount, group.variants[0].currency)} / ${intervalLabel(group.variants[0].interval, group.variants[0].intervalCount)}`
-                                                        : t("portal.variantsCount", { count: String(group.variants.length) })
-                                                    }
-                                                </div>
-                                            </button>
-                                        );
-                                    }}
-                                </For>
-                            </div>
-                        </Show>
-
-                        {/* Step 2 — flat radio list: interval + price per row */}
-                        <Show when={changePlanStep() === 2}>
-                            <button class="portal-back-btn" onClick={() => { setChangePlanStep(1); setSelectedPlan(""); }}>
-                                ← {t("common.back")}
-                            </button>
-                            <div class="portal-modal-title">{selectedGroupName()}</div>
-                            <div class="portal-modal-desc">{t("portal.pickVariantDesc")}</div>
-
-                            <div class="portal-plan-list">
-                                <For each={selectedGroupVariants()}>
-                                    {(variant) => {
-                                        const isCurrent = variant.id === data()?.subscriber?.subscription.id;
-                                        const isSelected = () => selectedPlan() === variant.id;
-                                        return (
-                                            <button
-                                                class={`portal-variant-row${isSelected() ? " selected" : ""}${isCurrent ? " current" : ""}`}
-                                                onClick={() => !isCurrent && setSelectedPlan(variant.id)}
-                                                disabled={isCurrent}
-                                            >
-                                                <div class={`portal-variant-radio${isSelected() ? " filled" : ""}`} />
-                                                <div class="portal-variant-interval">
-                                                    {intervalLabel(variant.interval, variant.intervalCount)}
-                                                </div>
-                                                <div class="portal-variant-price">
-                                                    {formatPrice(variant.amount, variant.currency)}
-                                                    <Show when={isCurrent}>
-                                                        <span class="portal-plan-card-badge" style="margin-left:8px">{t("portal.currentPlan")}</span>
-                                                    </Show>
-                                                </div>
-                                            </button>
-                                        );
-                                    }}
-                                </For>
-                            </div>
-
-                            <Show when={actionError()}><div class="error-msg">{actionError()}</div></Show>
-                            <div class="portal-modal-actions">
-                                <button class="portal-btn portal-btn-ghost" onClick={() => setShowChangeModal(false)} disabled={actionLoading()}>
-                                    {t("common.cancel")}
-                                </button>
-                                <button
-                                    class="portal-btn portal-btn-primary"
-                                    onClick={changePlan}
-                                    disabled={actionLoading() || !selectedPlan() || selectedPlan() === data()?.subscriber?.subscription.id}
-                                >
-                                    {actionLoading() ? t("common.processing") : t("portal.continueToPaymentBtn")}
-                                </button>
-                            </div>
-                        </Show>
-                    </div>
-                </div>
-            </Show>
 
             {/* ─── Renew Modal ─────────────────────────────────── */}
             <Show when={showRenewModal()}>

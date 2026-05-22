@@ -509,6 +509,28 @@ body {
 
 /* ─── Token Error (expired / invalid link) ─────────── */
 
+/* ─── Checkout Warning (existing subscription) ─────── */
+
+.checkout-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(246, 197, 99, 0.08);
+    border: 1px solid rgba(246, 197, 99, 0.2);
+    color: var(--warning);
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+.checkout-warning svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
 .token-error {
     display: flex;
     flex-direction: column;

@@ -19,23 +19,6 @@ export class PortalCancelBody {
     subscriberId!: string;
 }
 
-/** Body for `POST /api/portal/change` — change subscription plan. */
-export class PortalChangeBody {
-    /** Encrypted portal token. */
-    @Required()
-    @MinLength(1)
-    token!: string;
-
-    /** Current subscriber ID to cancel. */
-    @Required()
-    @Format("uuid")
-    subscriberId!: string;
-
-    /** New subscription plan ID to switch to. */
-    @Required()
-    @Format("uuid")
-    newSubscriptionId!: string;
-}
 
 /** Body for `POST /api/portal/renew` — renew an expired/cancelled subscription. */
 export class PortalRenewBody {

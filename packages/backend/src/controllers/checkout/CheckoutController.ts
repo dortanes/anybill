@@ -12,6 +12,7 @@ import { BadRequest, NotFound } from "@tsed/exceptions";
 import { Tags, Summary, Description, Returns } from "@tsed/schema";
 import { AppDataSource } from "../../core/datasource";
 import { Subscription } from "../../entities/Subscription";
+import { Subscriber } from "../../entities/Subscriber";
 import { AppError } from "../../core/errors/AppError";
 import { ErrorCode } from "../../core/errors/ErrorCode";
 import { Account } from "../../entities/Account";
@@ -131,6 +132,30 @@ export class CheckoutController {
             }
         }
 
+        // Check if the user already has an active subscription on a different plan.
+        // This lets the frontend warn about plan replacement before they pay.
+        let existingSubscription = undefined;
+        const now = new Date();
+        const existingSub = await AppDataSource.getRepository(Subscriber)
+            .createQueryBuilder("s")
+            .innerJoinAndSelect("s.subscription", "sub")
+            .where("s.uid = :uid", { uid: payload.uid })
+            .andWhere("s.subscriptionId != :subId", { subId: payload.sub_id })
+            .andWhere(
+                "(s.status = 'active' OR s.status = 'trialing' OR (s.status = 'cancelled' AND s.currentPeriodEnd > :now))",
+                { now },
+            )
+            .orderBy("s.currentPeriodEnd", "DESC")
+            .getOne();
+
+        if (existingSub) {
+            existingSubscription = {
+                name: existingSub.subscription.name,
+                status: existingSub.status,
+                currentPeriodEnd: existingSub.currentPeriodEnd,
+            };
+        }
+
         return {
             sub_id: payload.sub_id,
             uid: payload.uid,
@@ -147,6 +172,7 @@ export class CheckoutController {
             providers: this.billing.getProviders(),
             checkoutConfig: account?.checkoutConfig || {},
             coupon,
+            existingSubscription,
         };
     }
 

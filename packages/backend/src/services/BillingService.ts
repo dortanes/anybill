@@ -463,7 +463,6 @@ export class BillingService implements OnInit {
         if (subscriber) {
             const wasTrial = subscriber.status === "trialing";
             subscriber.status = "active";
-            subscriber.currentPeriodStart = new Date();
 
             // Clear trial end on conversion to paid.
             if (wasTrial) {
@@ -472,7 +471,21 @@ export class BillingService implements OnInit {
 
             const subscription = await AppDataSource.getRepository(Subscription).findOneBy({ id: invoice.subscriptionId });
             if (subscription && subscription.interval !== "one_time") {
-                subscriber.currentPeriodEnd = computePeriodEnd(subscription.interval, subscription.intervalCount);
+                // Stack periods for renewals: if this subscriber still has remaining
+                // time (e.g. provider-managed renewal or SDK early renewal), extend
+                // from currentPeriodEnd instead of resetting to now.
+                // NOTE: for plan changes, a new subscriber record is created with
+                // currentPeriodEnd=null, so periodBase naturally falls to now.
+                // This is intentional — different plans are different products,
+                // remaining time on the old plan does not transfer.
+                const now = new Date();
+                const periodBase = (subscriber.currentPeriodEnd && subscriber.currentPeriodEnd > now)
+                    ? subscriber.currentPeriodEnd
+                    : now;
+                subscriber.currentPeriodStart = now;
+                subscriber.currentPeriodEnd = computePeriodEnd(subscription.interval, subscription.intervalCount, periodBase);
+            } else {
+                subscriber.currentPeriodStart = new Date();
             }
 
             // Determine actual renewal mode based on provider capabilities.
@@ -682,8 +695,12 @@ export class BillingService implements OnInit {
         await invoiceRepo.save(invoice);
 
         subscriber.status = "active";
-        subscriber.currentPeriodStart = new Date();
-        subscriber.currentPeriodEnd = computePeriodEnd(subscription.interval, subscription.intervalCount);
+        const now = new Date();
+        const periodStart = (subscriber.currentPeriodEnd && subscriber.currentPeriodEnd > now)
+            ? subscriber.currentPeriodEnd
+            : now;
+        subscriber.currentPeriodStart = now;
+        subscriber.currentPeriodEnd = computePeriodEnd(subscription.interval, subscription.intervalCount, periodStart);
         subscriber.provider = providerName;
         subscriber.renewalMode = "provider_managed";
         await subscriberRepo.save(subscriber);
@@ -704,14 +721,16 @@ export class BillingService implements OnInit {
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /**
- * Compute the end date of a billing period starting from now.
+ * Compute the end date of a billing period.
  *
  * @param interval      - Billing interval type.
  * @param intervalCount - Number of intervals.
+ * @param from          - Start date (defaults to now). Pass the current
+ *                        period end to stack periods instead of resetting.
  * @returns The computed period end date.
  */
-function computePeriodEnd(interval: SubscriptionInterval, intervalCount: number): Date {
-    const end = new Date();
+function computePeriodEnd(interval: SubscriptionInterval, intervalCount: number, from?: Date): Date {
+    const end = new Date(from ?? new Date());
     switch (interval) {
         case "day":   end.setDate(end.getDate() + intervalCount); break;
         case "week":  end.setDate(end.getDate() + intervalCount * 7); break;

@@ -21,7 +21,6 @@ import { AppDataSource } from "../../core/datasource";
 import { AppError } from "../../core/errors/AppError";
 import { ErrorCode } from "../../core/errors/ErrorCode";
 import { Subscriber } from "../../entities/Subscriber";
-import { Subscription } from "../../entities/Subscription";
 import { Invoice } from "../../entities/Invoice";
 import { Account } from "../../entities/Account";
 import { Squad } from "../../entities/Squad";
@@ -30,7 +29,7 @@ import { BillingService } from "../../services/BillingService";
 import { OutgoingWebhookService } from "../../services/OutgoingWebhookService";
 import { verifyPortalToken } from "../../core/portalToken";
 import { createCheckoutToken } from "../../core/checkoutToken";
-import { PortalCancelBody, PortalChangeBody, PortalRenewBody } from "../../models/PortalModels";
+import { PortalCancelBody, PortalRenewBody } from "../../models/PortalModels";
 
 const CHECKOUT_ORIGIN = process.env.CHECKOUT_ORIGIN || "http://localhost:3002";
 
@@ -208,12 +207,6 @@ export class PortalController {
             });
         }
 
-        // Available plans for switching (only active plans).
-        const availablePlans = await AppDataSource.getRepository(Subscription).find({
-            where: { isActive: true },
-            order: { createdAt: "ASC" },
-        });
-
         return {
             uid,
             role,
@@ -246,15 +239,6 @@ export class PortalController {
                 provider: inv.provider,
                 paidAt: inv.paidAt,
                 createdAt: inv.createdAt,
-            })),
-            availablePlans: availablePlans.map((p) => ({
-                id: p.id,
-                name: p.name,
-                description: p.description,
-                amount: p.amount,
-                currency: p.currency,
-                interval: p.interval,
-                intervalCount: p.intervalCount,
             })),
             checkoutConfig: account?.checkoutConfig || {},
         };
@@ -323,76 +307,6 @@ export class PortalController {
         });
 
         return { success: true, status: "cancelled", accessUntil: subscriber.currentPeriodEnd ?? null };
-    }
-
-    /**
-     * Change subscription plan.
-     *
-     * Cancels the current subscriber and creates a checkout link for the
-     * new plan. The subscriber is redirected to the standard checkout flow
-     * where they can select a provider and complete payment.
-     */
-    @Post("/change")
-    @Summary("Change subscription plan")
-    @Description("Cancels current plan and returns a checkout URL for the new plan.")
-    @Returns(200)
-    @Returns(400)
-    @Returns(403)
-    @Returns(404)
-    async change(@BodyParams() { token, subscriberId, newSubscriptionId }: PortalChangeBody) {
-        const uid = this.verifyToken(token);
-        const subscriber = await this.loadSubscriber(subscriberId, uid);
-
-        // Validate the new plan exists and is active.
-        const newPlan = await AppDataSource.getRepository(Subscription).findOneBy({
-            id: newSubscriptionId,
-            isActive: true,
-        });
-        if (!newPlan) {
-            throw new AppError(404, ErrorCode.SUBSCRIPTION_NOT_FOUND, "Target subscription plan not found or inactive");
-        }
-
-        // Cannot change to the same plan.
-        if (subscriber.subscriptionId === newSubscriptionId) {
-            throw new AppError(400, ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE, "Already on this plan");
-        }
-
-        // Only allow plan changes for meaningful statuses.
-        const changeableStatuses = ["active", "trialing", "cancelled", "past_due"];
-        if (!changeableStatuses.includes(subscriber.status)) {
-            throw new AppError(400, ErrorCode.BAD_REQUEST, `Cannot change plan from status "${subscriber.status}"`);
-        }
-
-        // Do NOT cancel the current subscription yet.
-        // The old subscriber will be cancelled only after the new payment is confirmed
-        // (handled in BillingService.onPaymentConfirmed via prev_subscriber_id in the token).
-        // This ensures the user keeps access if they abandon the checkout.
-
-        // Cancel any pending invoices on the old subscription (stale unpaid ones).
-        await AppDataSource.getRepository(Invoice)
-            .createQueryBuilder()
-            .update(Invoice)
-            .set({ status: "cancelled" })
-            .where("subscriberId = :sid AND status = :status", {
-                sid: subscriberId,
-                status: "pending",
-            })
-            .execute();
-
-        // Create a checkout link for the new plan, embedding the current subscriber ID
-        // so BillingService can cancel the old subscription after payment succeeds.
-        const { token: checkoutToken } = createCheckoutToken(
-            newSubscriptionId,
-            uid,
-            1800,
-            undefined,
-            subscriber.id,  // prevSubscriberId
-        );
-        const checkoutUrl = `${CHECKOUT_ORIGIN}/pay/s/${checkoutToken}`;
-
-        this.logger.info(`Portal: plan change initiated ${subscriber.subscriptionId} → ${newSubscriptionId} for uid ${uid}`);
-
-        return { checkoutUrl };
     }
 
     /**
