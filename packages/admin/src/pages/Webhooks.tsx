@@ -10,6 +10,18 @@ const EVENT_TYPES = [
     "payment.cancelled",
     "subscription.renewed",
     "subscription.expired",
+    "subscription.cancelled",
+    "squad.created",
+    "squad.dissolved",
+    "squad.member_added",
+    "squad.member_removed",
+    "squad.invite_created",
+    "squad.invite_accepted",
+    "squad.invite_declined",
+    "squad.invite_cancelled",
+    "coupon.redeemed",
+    "trial.started",
+    "trial.expired",
 ];
 
 export function Webhooks() {
