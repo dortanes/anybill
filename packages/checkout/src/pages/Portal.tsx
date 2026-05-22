@@ -404,6 +404,13 @@ export function PortalPage() {
                                                     {t("portal.cancelledNoActions")}
                                                 </div>
                                             </Show>
+
+                                            {/* Active manual renewal — no actions needed */}
+                                            <Show when={!isOneTime && !canCancel() && !canRenew() && (sub.status === "active" || sub.status === "trialing")}>
+                                                <div class="portal-no-actions">
+                                                    {t("portal.manualActiveNoActions")}
+                                                </div>
+                                            </Show>
                                         </div>
                                     );
                                 })()}
