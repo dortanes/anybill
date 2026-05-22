@@ -170,3 +170,223 @@ export interface Coupon {
     isActive: boolean;
     createdAt: string;
 }
+
+// ─── Event Streaming Types ──────────────────────────────────────────
+
+/** All event types emitted by AnyBill. */
+export type WebhookEventType =
+    | "payment.confirmed"
+    | "payment.failed"
+    | "payment.refunded"
+    | "payment.cancelled"
+    | "subscription.renewed"
+    | "subscription.expired"
+    | "subscription.cancelled"
+    | "squad.created"
+    | "squad.dissolved"
+    | "squad.member_added"
+    | "squad.member_removed"
+    | "squad.invite_created"
+    | "squad.invite_accepted"
+    | "squad.invite_declined"
+    | "squad.invite_cancelled"
+    | "coupon.redeemed"
+    | "trial.started"
+    | "trial.expired";
+
+/** Payload for `payment.confirmed` event. */
+export interface PaymentConfirmedEvent {
+    invoiceId: string;
+    subscriberId: string;
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    provider: string;
+    providerInvoiceId: string | null;
+    paidAt: string;
+}
+
+/** Payload for `payment.failed` event. */
+export interface PaymentFailedEvent {
+    invoiceId: string;
+    subscriberId: string;
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    provider: string;
+}
+
+/** Payload for `payment.refunded` event. */
+export interface PaymentRefundedEvent {
+    invoiceId: string;
+    subscriberId: string;
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    provider: string;
+}
+
+/** Payload for `payment.cancelled` event. */
+export interface PaymentCancelledEvent {
+    invoiceId: string;
+    subscriberId: string;
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    provider: string;
+    reason?: string;
+}
+
+/** Payload for `subscription.renewed` event. */
+export interface SubscriptionRenewedEvent {
+    invoiceId: string;
+    subscriberId: string;
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    provider: string;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+}
+
+/** Payload for `subscription.expired` event. */
+export interface SubscriptionExpiredEvent {
+    subscriberId: string;
+    subscriptionId: string;
+    uid: string;
+    expiredAt: string;
+}
+
+/** Payload for `subscription.cancelled` event. */
+export interface SubscriptionCancelledEvent {
+    subscriberId: string;
+    subscriptionId: string;
+    uid: string;
+    cancelledVia: "portal" | "plan_change";
+    accessUntil: string | null;
+    /** Present when cancelled due to plan change. */
+    newSubscriberId?: string;
+    /** Present when cancelled due to plan change. */
+    newSubscriptionId?: string;
+}
+
+/** Payload for `squad.created` event. */
+export interface SquadCreatedEvent {
+    squadId: string;
+    ownerUid: string;
+    subscriberId: string;
+    subscriptionId: string;
+    maxMembers?: number;
+    ownerId?: string;
+}
+
+/** Payload for `squad.dissolved` event. */
+export interface SquadDissolvedEvent {
+    squadId: string;
+    ownerUid: string;
+}
+
+/** Payload for `squad.member_added` event. */
+export interface SquadMemberAddedEvent {
+    squadId: string;
+    memberUid: string;
+    memberId: string;
+    ownerUid: string;
+    subscriptionId: string;
+}
+
+/** Payload for `squad.member_removed` event. */
+export interface SquadMemberRemovedEvent {
+    squadId: string;
+    memberUid: string;
+    memberId: string;
+    ownerUid: string;
+    subscriptionId: string;
+}
+
+/** Payload for `squad.invite_created` event. */
+export interface SquadInviteCreatedEvent {
+    squadId: string;
+    inviteId: string;
+    ownerUid: string;
+    inviteeUid: string;
+    expiresAt: string | null;
+}
+
+/** Payload for `squad.invite_accepted` event. */
+export interface SquadInviteAcceptedEvent {
+    squadId: string;
+    inviteId: string;
+    ownerUid: string;
+    inviteeUid: string;
+}
+
+/** Payload for `squad.invite_declined` event. */
+export interface SquadInviteDeclinedEvent {
+    squadId: string;
+    inviteId: string;
+    ownerUid: string;
+    inviteeUid: string;
+}
+
+/** Payload for `squad.invite_cancelled` event. */
+export interface SquadInviteCancelledEvent {
+    squadId: string;
+    inviteId: string;
+    ownerUid: string;
+    inviteeUid: string;
+}
+
+/** Payload for `coupon.redeemed` event. */
+export interface CouponRedeemedEvent {
+    couponId: string;
+    invoiceId: string;
+    subscriberId: string;
+    subscriptionId: string;
+    discountAmount: number;
+    originalAmount: number;
+    finalAmount: number;
+}
+
+/** Payload for `trial.started` event. */
+export interface TrialStartedEvent {
+    subscriberId: string;
+    subscriptionId: string;
+    uid: string;
+    trialDays: number;
+    trialEnd: string;
+}
+
+/** Payload for `trial.expired` event. */
+export interface TrialExpiredEvent {
+    subscriberId: string;
+    subscriptionId: string;
+    uid: string;
+    trialEnd: string;
+}
+
+/**
+ * Maps each webhook event type to its typed payload.
+ *
+ * Used by {@link EventStream} to provide type-safe event handlers.
+ */
+export interface WebhookEventMap {
+    "payment.confirmed": PaymentConfirmedEvent;
+    "payment.failed": PaymentFailedEvent;
+    "payment.refunded": PaymentRefundedEvent;
+    "payment.cancelled": PaymentCancelledEvent;
+    "subscription.renewed": SubscriptionRenewedEvent;
+    "subscription.expired": SubscriptionExpiredEvent;
+    "subscription.cancelled": SubscriptionCancelledEvent;
+    "squad.created": SquadCreatedEvent;
+    "squad.dissolved": SquadDissolvedEvent;
+    "squad.member_added": SquadMemberAddedEvent;
+    "squad.member_removed": SquadMemberRemovedEvent;
+    "squad.invite_created": SquadInviteCreatedEvent;
+    "squad.invite_accepted": SquadInviteAcceptedEvent;
+    "squad.invite_declined": SquadInviteDeclinedEvent;
+    "squad.invite_cancelled": SquadInviteCancelledEvent;
+    "coupon.redeemed": CouponRedeemedEvent;
+    "trial.started": TrialStartedEvent;
+    "trial.expired": TrialExpiredEvent;
+}

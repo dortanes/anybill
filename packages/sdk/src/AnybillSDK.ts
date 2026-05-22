@@ -18,6 +18,8 @@
  */
 
 import type { AnybillSDKConfig, Subscription, Subscriber, Invoice, CheckoutLink, PortalLink, Squad, SquadMember, SquadInvite, InviteStatus, AccessCheck } from "./types";
+import { EventStream } from "./EventStream";
+import type { WebhookEventType } from "./types";
 
 /**
  * AnyBill SDK client.
@@ -345,6 +347,44 @@ export class AnybillSDK {
                 if (status) url += `&status=${encodeURIComponent(status)}`;
                 return this.request(url);
             },
+        },
+    };
+
+    /**
+     * Real-time event streaming via Server-Sent Events (SSE).
+     *
+     * Subscribe to billing events in real time. The SDK maintains
+     * a persistent connection to the AnyBill backend and delivers
+     * events as they occur.
+     *
+     * @example
+     * ```ts
+     * const stream = sdk.events.subscribe(["payment.confirmed"]);
+     *
+     * stream.on("payment.confirmed", (data) => {
+     *   console.log("Paid!", data.invoiceId, data.amount);
+     * });
+     *
+     * // Listen to all events:
+     * const allStream = sdk.events.subscribe();
+     *
+     * // Clean up when done:
+     * stream.close();
+     * ```
+     */
+    readonly events = {
+        /**
+         * Open an SSE stream and subscribe to real-time events.
+         *
+         * @param events - Event types to listen for. Omit or pass empty array for all events.
+         * @returns An {@link EventStream} instance with typed `.on()` handlers.
+         */
+        subscribe: (events?: WebhookEventType[]): EventStream => {
+            return new EventStream({
+                baseUrl: this.baseUrl,
+                apiKey: this.apiKey,
+                events,
+            });
         },
     };
 

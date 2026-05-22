@@ -12,6 +12,7 @@ import { AppDataSource } from "../core/datasource";
 import { WebhookEndpoint } from "../entities/WebhookEndpoint";
 import { WebhookDelivery } from "../entities/WebhookDelivery";
 import { LessThanOrEqual } from "typeorm";
+import { EventBus } from "./EventBus";
 
 /** All event types AnyBill can emit. */
 export type WebhookEventType =
@@ -49,6 +50,9 @@ export class OutgoingWebhookService implements OnInit, OnDestroy {
     @Inject()
     logger!: Logger;
 
+    @Inject()
+    private readonly eventBus!: EventBus;
+
     async $onInit(): Promise<void> {
         this.retryInterval = setInterval(() => this.processRetries(), RETRY_POLL_MS);
         this.logger.info("Outgoing webhook service ready");
@@ -64,6 +68,8 @@ export class OutgoingWebhookService implements OnInit, OnDestroy {
      * @param data  - Event payload data.
      */
     async dispatch(event: WebhookEventType, data: Record<string, any>): Promise<void> {
+        this.eventBus.emit(event, data);
+
         const epRepo = AppDataSource.getRepository(WebhookEndpoint);
         const endpoints = await epRepo.find({ where: { isActive: true } });
 

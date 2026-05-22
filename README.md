@@ -39,6 +39,7 @@ Payment providers are connected through the `@anybill/sdk` — you extend a base
 - **Client portal** — encrypted-token-based subscriber self-service: cancel, renew, change plan.
 - **Coupons & promo codes** — percentage or fixed-amount discounts with per-user limits, plan restrictions, and expiration.
 - **Trial periods** — free trial days configurable per subscription plan, with seamless SDK-driven activation.
+- **Real-time events** — SSE-based event streaming through the SDK with typed payloads, auto-reconnect, and `Last-Event-ID` replay.
 
 ## Quick Start
 
@@ -169,6 +170,20 @@ const members = await client.squads.getMembers("squad_id");
 await client.squads.invites.create("squad_id", "friend_uid");      // owner invites
 const inbox = await client.squads.invites.incoming("friend_uid", "pending"); // friend's inbox
 await client.squads.invites.accept("squad_id", inbox[0].id, "friend_uid");   // friend accepts
+
+// Real-time event streaming (SSE)
+const stream = client.events.subscribe(["payment.confirmed", "subscription.renewed"]);
+
+stream.on("payment.confirmed", (data) => {
+  console.log(`Paid: ${data.invoiceId}, ${data.amount} ${data.currency}`);
+});
+
+stream.on("subscription.renewed", (data) => {
+  console.log(`Renewed until ${data.currentPeriodEnd}`);
+});
+
+// When done:
+stream.close();
 ```
 
 Full SDK reference: [`packages/sdk/README.md`](packages/sdk/README.md)
@@ -199,6 +214,44 @@ Failed deliveries are retried with exponential backoff (10s → 1m → 5m → 30
 | `coupon.redeemed` | Coupon applied to a paid invoice |
 | `trial.started` | Free trial activated |
 | `trial.expired` | Free trial period ended |
+
+All events are also available as a real-time SSE stream — see [Event Streaming](#event-streaming).
+
+## Event Streaming
+
+The SDK provides real-time event streaming via Server-Sent Events (SSE). Events are delivered as they occur, with fully typed payloads.
+
+```typescript
+import { AnybillSDK } from "@anybill/sdk";
+import type { PaymentConfirmedEvent } from "@anybill/sdk";
+
+const client = new AnybillSDK({ baseUrl: "...", apiKey: "ak_..." });
+
+// Subscribe to specific events
+const stream = client.events.subscribe(["payment.confirmed", "subscription.cancelled"]);
+
+// Type-safe handlers — IDE autocompletes payload fields
+stream.on("payment.confirmed", (data) => {
+  // data: PaymentConfirmedEvent
+  console.log(data.invoiceId, data.amount, data.currency);
+});
+
+stream.on("subscription.cancelled", (data) => {
+  // data: SubscriptionCancelledEvent
+  console.log(`${data.uid} cancelled via ${data.cancelledVia}`);
+});
+
+// Subscribe to all events
+const allStream = client.events.subscribe();
+
+// Lifecycle
+stream.on("connected", () => console.log("SSE connected"));
+stream.on("error", (err) => console.error("SSE error:", err));
+
+// Clean up
+stream.close();
+```
+
 
 ## Configuration
 
@@ -294,6 +347,7 @@ API key-protected. Used by client applications via the TypeScript SDK.
 | `POST` | `/squads/:id/invites/:id/decline` | Decline invite |
 | `DELETE` | `/squads/:id/invites/:id` | Cancel invite |
 | `GET` | `/invites` | List incoming invites by UID |
+| `GET` | `/stream` | SSE real-time event stream |
 
 </details>
 

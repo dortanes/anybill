@@ -60,6 +60,7 @@ import { WebhookController } from "../controllers/webhook/WebhookController";
 // ─── SDK Controllers ────────────────────────────────────────────────
 import { SdkController } from "../controllers/sdk/SdkController";
 import { SquadController } from "../controllers/sdk/SquadController";
+import { SdkEventsController } from "../controllers/sdk/SdkEventsController";
 
 // ─── Health ─────────────────────────────────────────────────────────
 import { HealthController } from "../controllers/HealthController";
@@ -88,7 +89,7 @@ import "../services/InvoiceExpirationWorker";
         "/api/checkout": [CheckoutController],
         "/api/portal": [PortalController],
         "/api/webhook": [WebhookController],
-        "/api/sdk": [SdkController, SquadController],
+        "/api/sdk": [SdkController, SquadController, SdkEventsController],
         "/": [HealthController],
     },
     swagger: [

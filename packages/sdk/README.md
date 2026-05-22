@@ -60,6 +60,31 @@ await client.squads.addMember("squad-id", "friend-uid");
 await client.squads.removeMember("squad-id", "friend-uid");
 ```
 
+```typescript
+// --- Real-time Event Streaming (SSE) ---
+
+const stream = client.events.subscribe(["payment.confirmed", "subscription.renewed"]);
+
+stream.on("payment.confirmed", (data) => {
+  // data is fully typed: invoiceId, amount, currency, provider, paidAt, ...
+  console.log(`Payment ${data.invoiceId}: ${data.amount} ${data.currency}`);
+});
+
+stream.on("subscription.renewed", (data) => {
+  console.log(`Renewed until ${data.currentPeriodEnd}`);
+});
+
+// Lifecycle events
+stream.on("connected", () => console.log("SSE connected"));
+stream.on("error", (err) => console.error(err));
+
+// Subscribe to ALL events
+const allStream = client.events.subscribe();
+
+// Clean up when done
+stream.close();
+```
+
 ### Methods
 
 | Method                     | Description                          |
@@ -79,6 +104,19 @@ await client.squads.removeMember("squad-id", "friend-uid");
 | `squads.addMember(squadId, uid)`       | Add member to squad |
 | `squads.removeMember(squadId, uid)`    | Remove member from squad |
 | `squads.getMembers(squadId)`           | List active squad members |
+| `squads.invites.create(squadId, uid)`  | Create an invite for a user |
+| `squads.invites.list(squadId)`         | List squad invites |
+| `squads.invites.accept(squadId, inviteId, uid)` | Accept an invite |
+| `squads.invites.decline(squadId, inviteId, uid)` | Decline an invite |
+| `squads.invites.cancel(squadId, inviteId)` | Cancel an invite (owner) |
+| `squads.invites.incoming(uid)`         | Get incoming invites for a user |
+| `events.subscribe(events?)`            | Open SSE stream for real-time events |
+
+### Event Streaming
+
+`events.subscribe()` returns an `EventStream` with typed `.on()` handlers. Supports auto-reconnect and `Last-Event-ID` replay.
+
+Available events: `payment.confirmed`, `payment.failed`, `payment.refunded`, `payment.cancelled`, `subscription.renewed`, `subscription.expired`, `subscription.cancelled`, `squad.created`, `squad.dissolved`, `squad.member_added`, `squad.member_removed`, `squad.invite_created`, `squad.invite_accepted`, `squad.invite_declined`, `squad.invite_cancelled`, `coupon.redeemed`, `trial.started`, `trial.expired`.
 
 ## Provider API
 
